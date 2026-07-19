@@ -1,0 +1,45 @@
+# Full local stack: Postgres + the app itself, built from the Dockerfile.
+# For dev with hot-reload, prefer `npm run dev` against `docker compose up db`
+# instead — this full-stack config is closer to how it'd run in production.
+version: "3.8"
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hr
+      POSTGRES_PASSWORD: hr_dev_password
+      POSTGRES_DB: hr_system
+    ports:
+      - "5432:5432"
+    volumes:
+      - hr_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hr"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://hr:hr_dev_password@db:5432/hr_system?schema=public
+      DIRECT_URL: postgresql://hr:hr_dev_password@db:5432/hr_system?schema=public
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: dev-only-secret-change-in-production
+      STORAGE_PROVIDER: local
+      EMAIL_PROVIDER: console
+    volumes:
+      # Local-disk uploads need a persistent volume even in the "app" service —
+      # switch STORAGE_PROVIDER to s3 for a real multi-instance deployment.
+      - hr_uploads:/app/public/uploads
+
+volumes:
+  hr_db_data:
+  hr_uploads:

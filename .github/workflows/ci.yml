@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: hr
+          POSTGRES_PASSWORD: hr_test_password
+          POSTGRES_DB: hr_system_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hr"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://hr:hr_test_password@localhost:5432/hr_system_test?schema=public
+      DIRECT_URL: postgresql://hr:hr_test_password@localhost:5432/hr_system_test?schema=public
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ci-only-secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Validate schema
+        run: npx prisma validate
+
+      - name: Check schema formatting
+        run: npx prisma format --check
+
+      # If prisma/migrations exists (once the project has a real migration
+      # history), this applies it and is the stronger check — it catches a
+      # migration that doesn't actually match schema.prisma. Until then,
+      # `db push` syncs the ephemeral CI database directly from the schema,
+      # which is fine for a ephemeral test DB but is NOT a substitute for
+      # committing real migrations before deploying to production.
+      - name: Sync test database schema
+        run: |
+          if [ -d "prisma/migrations" ] && [ "$(ls -A prisma/migrations)" ]; then
+            npx prisma migrate deploy
+          else
+            npx prisma db push --skip-generate --accept-data-loss
+          fi
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run unit tests
+        run: npm run test
+
+      - name: Build
+        run: npm run build

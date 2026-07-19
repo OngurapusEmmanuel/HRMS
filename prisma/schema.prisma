@@ -1,0 +1,807 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------- ENUMS ----------
+
+enum Role {
+  ADMIN     // Full system access, billing, org settings
+  HR        // Manage employees, leave approvals, payroll
+  MANAGER   // Approve leave/attendance for their department
+  EMPLOYEE  // Self-service: profile, leave requests, attendance
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  ON_LEAVE
+  SUSPENDED
+  TERMINATED
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  UNPAID
+  MATERNITY
+  PATERNITY
+  OTHER
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  HALF_DAY
+  ON_LEAVE
+}
+
+enum ContractRecommendation {
+  RENEW
+  DO_NOT_RENEW
+  PROMOTE
+  EXTEND_PROBATION
+}
+
+// ---------- ATS ENUMS ----------
+
+enum JobPostingStatus {
+  DRAFT
+  OPEN
+  CLOSED
+}
+
+enum ApplicationStage {
+  APPLIED
+  SCREENING
+  INTERVIEW
+  OFFER
+  HIRED
+  REJECTED
+}
+
+enum InterviewOutcome {
+  PENDING
+  PASS
+  FAIL
+}
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+// ---------- PERFORMANCE ENUMS ----------
+
+enum KpiStatus {
+  ON_TRACK
+  AT_RISK
+  OFF_TRACK
+  COMPLETED
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum FeedbackRelationship {
+  SELF
+  MANAGER
+  PEER
+  DIRECT_REPORT
+}
+
+// ---------- L&D ENUMS ----------
+
+enum CourseCategory {
+  COMPLIANCE
+  SKILLS
+  CAREER
+}
+
+enum EnrollmentStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+}
+
+// ---------- COMPLIANCE ENUMS ----------
+
+enum ComplianceFrequency {
+  ONE_TIME
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+}
+
+enum ComplianceRecordStatus {
+  UPCOMING
+  COMPLETE
+  OVERDUE
+}
+
+// ---------- CORE MODELS ----------
+
+// One row per company using the platform (multi-tenant from day one).
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  createdAt   DateTime @default(now())
+
+  users        User[]
+  departments  Department[]
+  employees    Employee[]
+  leaveBalancesPolicy LeavePolicy[]
+  taxBrackets  TaxBracket[]
+  onboardingTaskTemplates OnboardingTaskTemplate[]
+  appraisals   Appraisal[]
+  contractSummaries ContractSummary[]
+  jobPostings  JobPosting[]
+  candidates   Candidate[]
+  applications Application[]
+  interviews   Interview[]
+  offers       Offer[]
+  kpis         Kpi[]
+  appraisalMeetings AppraisalMeeting[]
+  feedbackRequests FeedbackRequest[]
+  trainingCourses TrainingCourse[]
+  complianceRequirements ComplianceRequirement[]
+  complianceRecords ComplianceRecord[]
+
+  @@map("organizations")
+}
+
+// Auth identity. Every employee has a User; not every User needs an Employee
+// record on day one (e.g. an Admin who isn't on payroll).
+model User {
+  id             String       @id @default(cuid())
+  email          String       @unique
+  passwordHash   String
+  role           Role         @default(EMPLOYEE)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee       Employee?
+  passwordResetTokens PasswordResetToken[]
+  notifications  Notification[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@map("users")
+}
+
+model Department {
+  id             String       @id @default(cuid())
+  name           String
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  managerId      String?
+  manager        Employee?    @relation("DepartmentManager", fields: [managerId], references: [id])
+  employees      Employee[]   @relation("DepartmentEmployees")
+  jobPostings    JobPosting[]
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, name])
+  @@map("departments")
+}
+
+model Employee {
+  id              String            @id @default(cuid())
+  employeeCode    String            // human-readable ID e.g. EMP-0001
+  userId          String            @unique
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId  String
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  firstName       String
+  lastName        String
+  phone           String?
+  jobTitle        String
+  status          EmploymentStatus  @default(ACTIVE)
+  hireDate        DateTime
+  contractEndDate DateTime?         // set for fixed-term contracts; null = permanent/no fixed end
+  terminationDate DateTime?
+  baseSalary      Decimal           @db.Decimal(12, 2)
+
+  departmentId    String?
+  department      Department?       @relation("DepartmentEmployees", fields: [departmentId], references: [id])
+  managerOf       Department[]      @relation("DepartmentManager")
+
+  reportsToId     String?
+  reportsTo       Employee?         @relation("EmployeeHierarchy", fields: [reportsToId], references: [id])
+  directReports   Employee[]        @relation("EmployeeHierarchy")
+
+  leaveRequests   LeaveRequest[]
+  leaveBalances   LeaveBalance[]
+  attendance      AttendanceRecord[]
+  payslips        Payslip[]
+  documents       EmployeeDocument[]
+  onboardingTasks OnboardingTask[]
+  appraisalsReceived Appraisal[]    @relation("AppraisalSubject")
+  appraisalsGiven    Appraisal[]    @relation("AppraisalReviewer")
+  contractSummary    ContractSummary?
+  interviewsConducted Interview[]
+  kpis               Kpi[]
+  appraisalMeetingsAsSubject   AppraisalMeeting[] @relation("MeetingSubject")
+  appraisalMeetingsOrganized   AppraisalMeeting[] @relation("MeetingOrganizer")
+  feedbackAbout      FeedbackRequest[] @relation("FeedbackSubject")
+  feedbackGiven      FeedbackRequest[] @relation("FeedbackProvider")
+  trainingEnrollments TrainingEnrollment[]
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([organizationId, employeeCode])
+  @@index([organizationId, departmentId])
+  @@index([organizationId, status])
+  @@map("employees")
+}
+
+// ---------- LEAVE MANAGEMENT ----------
+
+model LeavePolicy {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  type           LeaveType
+  annualDays     Int          // days accrued per year for this leave type
+
+  @@unique([organizationId, type])
+  @@map("leave_policies")
+}
+
+// Progressive annual income tax brackets, editable per-organization from
+// /settings instead of hardcoded — see lib/payroll.ts. `upTo` null marks the
+// top (uncapped) bracket. Ordered by `order` ascending when applied.
+model TaxBracket {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  upTo           Decimal?     @db.Decimal(14, 2) // annual income threshold; null = uncapped top bracket
+  rate           Decimal      @db.Decimal(5, 4)  // marginal rate, e.g. 0.2500 = 25%
+  order          Int          @default(0)
+
+  @@index([organizationId, order])
+  @@map("tax_brackets")
+}
+
+model LeaveBalance {
+  id         String    @id @default(cuid())
+  employeeId String
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type       LeaveType
+  year       Int
+  entitled   Int
+  used       Int       @default(0)
+
+  @@unique([employeeId, type, year])
+  @@map("leave_balances")
+}
+
+model LeaveRequest {
+  id          String      @id @default(cuid())
+  employeeId  String
+  employee    Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type        LeaveType
+  startDate   DateTime
+  endDate     DateTime
+  daysCount   Int
+  reason      String?
+  status      LeaveStatus @default(PENDING)
+  reviewedBy  String?     // Employee id of approver
+  reviewedAt  DateTime?
+  createdAt   DateTime    @default(now())
+
+  @@index([employeeId, status])
+  @@map("leave_requests")
+}
+
+// ---------- ATTENDANCE ----------
+
+model AttendanceRecord {
+  id         String            @id @default(cuid())
+  employeeId String
+  employee   Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date       DateTime          @db.Date
+  checkIn    DateTime?
+  checkOut   DateTime?
+  status     AttendanceStatus  @default(PRESENT)
+
+  @@unique([employeeId, date])
+  @@index([employeeId, date])
+  @@map("attendance_records")
+}
+
+// ---------- APPRAISALS ----------
+
+// A single periodic review, filed by a manager (or HR/Admin) against one
+// employee. `scores` holds the per-criterion ratings (1-5) as JSON — kept
+// flexible rather than one column per criterion, since the criteria set is
+// editable; `overallRating` is the computed average, denormalized onto the
+// row so it can be queried/sorted/aggregated without recomputing from JSON
+// on every read (used heavily by ContractSummary generation below).
+// Appraisals are treated as an immutable historical record once submitted —
+// no update/delete endpoint — matching how a real performance review
+// history should behave.
+model Appraisal {
+  id             String       @id @default(cuid())
+  employeeId     String
+  employee       Employee     @relation("AppraisalSubject", fields: [employeeId], references: [id], onDelete: Cascade)
+  reviewerId     String
+  reviewer       Employee     @relation("AppraisalReviewer", fields: [reviewerId], references: [id])
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  periodStart    DateTime
+  periodEnd      DateTime
+  scores         Json         // { "Communication": 4, "Technical Skills": 5, ... }
+  overallRating  Decimal      @db.Decimal(3, 2) // average of `scores`, 1.00–5.00
+
+  strengths            String?
+  areasForImprovement  String?
+  goals                String?
+  comments             String?
+
+  createdAt      DateTime     @default(now())
+
+  @@index([employeeId, periodEnd])
+  @@index([organizationId, periodEnd])
+  @@map("appraisals")
+}
+
+// The rollup generated when an employee's contract ends — either because
+// they were terminated, or because HR/Admin manually triggers it (e.g. a
+// fixed-term contract approaching contractEndDate). One per employee;
+// regenerating overwrites the previous summary rather than accumulating
+// duplicates, since it's meant to reflect "as of contract end", not a
+// history of its own — the underlying Appraisal rows are the history.
+model ContractSummary {
+  id             String                  @id @default(cuid())
+  employeeId     String                  @unique
+  employee       Employee                @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  periodStart      DateTime              // employee's hireDate at generation time
+  periodEnd        DateTime              // terminationDate/contractEndDate at generation time
+  totalAppraisals  Int
+  averageRating    Decimal?              @db.Decimal(3, 2)
+  ratingTrend      String?               // "Improving" | "Declining" | "Stable" | "Insufficient data"
+  strengthsSummary String?
+  improvementAreas String?
+  recommendation   ContractRecommendation?
+  generatedById    String?               // User id who triggered generation (null if system-triggered)
+  generatedAt      DateTime              @default(now())
+
+  @@map("contract_summaries")
+}
+
+// ---------- ATS (RECRUITMENT) ----------
+
+// A posted role. `hiringManagerId` is who the pipeline is scoped to for
+// department-level visibility, same canActOnDepartment pattern as everything
+// else — reuses `departmentId` for that, not a separate ownership field.
+model JobPosting {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  departmentId   String?
+  department     Department?      @relation(fields: [departmentId], references: [id])
+  description    String
+  status         JobPostingStatus @default(DRAFT)
+  postedById     String           // Employee id who created the posting
+  postedAt       DateTime?
+  closesAt       DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  applications   Application[]
+
+  @@index([organizationId, status])
+  @@map("job_postings")
+}
+
+// A person applying — deliberately NOT a User/Employee until hired. Keeping
+// candidates as their own lightweight identity avoids creating throwaway
+// auth accounts for people who never join, and matches how every real ATS
+// models this (candidate → employee is a conversion, not the same row).
+model Candidate {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  firstName      String
+  lastName       String
+  email          String
+  phone          String?
+  resumeUrl      String?
+  source         String?       // "referral", "LinkedIn", "career site", etc — free text
+  createdAt      DateTime      @default(now())
+
+  applications   Application[]
+
+  @@unique([organizationId, email])
+  @@map("candidates")
+}
+
+// One candidate's pipeline through one job posting. `stage` is the
+// screening/pipeline status; terminal states are HIRED and REJECTED.
+model Application {
+  id             String            @id @default(cuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  candidateId    String
+  candidate      Candidate         @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  jobPostingId   String
+  jobPosting     JobPosting        @relation(fields: [jobPostingId], references: [id], onDelete: Cascade)
+  stage          ApplicationStage  @default(APPLIED)
+  notes          String?
+  hiredEmployeeId String?          // set when this application converts to a hire
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  interviews     Interview[]
+  offer          Offer?
+
+  @@index([organizationId, stage])
+  @@index([jobPostingId])
+  @@map("applications")
+}
+
+model Interview {
+  id             String            @id @default(cuid())
+  applicationId  String
+  application    Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  interviewerId  String            // Employee id conducting it
+  interviewer    Employee          @relation(fields: [interviewerId], references: [id])
+  scheduledAt    DateTime
+  notes          String?
+  outcome        InterviewOutcome  @default(PENDING)
+  createdAt      DateTime          @default(now())
+
+  @@index([applicationId])
+  @@map("interviews")
+}
+
+model Offer {
+  id             String       @id @default(cuid())
+  applicationId  String       @unique
+  application    Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  proposedSalary Decimal      @db.Decimal(12, 2)
+  startDate      DateTime
+  status         OfferStatus  @default(PENDING)
+  extendedById   String       // Employee id
+  respondedAt    DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@map("offers")
+}
+
+// ---------- PERFORMANCE: KPIs, MEETINGS, 360 FEEDBACK ----------
+
+// A trackable goal/metric for one employee over a period. Kept independent
+// of Appraisal (not nested inside it) so KPIs can be updated continuously
+// between review cycles rather than only at appraisal time.
+model Kpi {
+  id             String    @id @default(cuid())
+  employeeId     String
+  employee       Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  target         Decimal   @db.Decimal(12, 2)
+  current        Decimal   @db.Decimal(12, 2) @default(0)
+  unit           String?   // "%", "$", "tickets", etc — free text label
+  periodStart    DateTime
+  periodEnd      DateTime
+  status         KpiStatus @default(ON_TRACK)
+  createdById    String    // Employee id who set it (usually the manager)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([employeeId, periodEnd])
+  @@map("kpis")
+}
+
+// A scheduled appraisal conversation — distinct from the Appraisal record
+// itself (the written review). This is the calendar-facing piece: managers
+// schedule the meeting, then file the Appraisal after it happens.
+model AppraisalMeeting {
+  id             String        @id @default(cuid())
+  employeeId     String
+  employee       Employee      @relation("MeetingSubject", fields: [employeeId], references: [id], onDelete: Cascade)
+  organizerId    String
+  organizer      Employee      @relation("MeetingOrganizer", fields: [organizerId], references: [id])
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  scheduledAt    DateTime
+  status         MeetingStatus @default(SCHEDULED)
+  notes          String?
+  createdAt      DateTime      @default(now())
+
+  @@index([employeeId, scheduledAt])
+  @@map("appraisal_meetings")
+}
+
+// A single 360-degree feedback submission about one employee. `requestedById`
+// is who initiated the round (usually the manager or HR running the cycle);
+// `providerId` is null for anonymous peer feedback, set otherwise.
+model FeedbackRequest {
+  id             String                @id @default(cuid())
+  employeeId     String                // who the feedback is about
+  employee       Employee              @relation("FeedbackSubject", fields: [employeeId], references: [id], onDelete: Cascade)
+  providerId     String?               // who is giving it (null = anonymous)
+  provider       Employee?             @relation("FeedbackProvider", fields: [providerId], references: [id])
+  requestedById  String                // Employee id who initiated the round
+  organizationId String
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  relationship   FeedbackRelationship
+  submitted      Boolean               @default(false)
+  strengths      String?
+  areasForImprovement String?
+  comments       String?
+  submittedAt    DateTime?
+  createdAt      DateTime              @default(now())
+
+  @@index([employeeId])
+  @@map("feedback_requests")
+}
+
+// ---------- LEARNING & DEVELOPMENT ----------
+
+model TrainingCourse {
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  category       CourseCategory @default(SKILLS)
+  durationHours  Decimal        @db.Decimal(5, 2) @default(1)
+  required       Boolean        @default(false) // e.g. mandatory compliance training
+  createdAt      DateTime       @default(now())
+
+  enrollments    TrainingEnrollment[]
+
+  @@index([organizationId, category])
+  @@map("training_courses")
+}
+
+model TrainingEnrollment {
+  id             String            @id @default(cuid())
+  employeeId     String
+  employee       Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  courseId       String
+  course         TrainingCourse    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  status         EnrollmentStatus  @default(NOT_STARTED)
+  dueDate        DateTime?
+  completedAt    DateTime?
+  assignedById   String?           // Employee id who assigned it, null if self-enrolled
+  createdAt      DateTime          @default(now())
+
+  @@unique([employeeId, courseId])
+  @@index([employeeId, status])
+  @@map("training_enrollments")
+}
+
+// ---------- COMPLIANCE MANAGEMENT ----------
+
+// A recurring statutory/labor-law obligation the org needs to track — e.g.
+// "Quarterly payroll tax filing", "Annual OSHA report". This is a tracking
+// checklist, not a legal database — the org defines what applies to them.
+model ComplianceRequirement {
+  id             String              @id @default(cuid())
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  jurisdiction   String?             // free text, e.g. "Kenya", "US-CA"
+  frequency      ComplianceFrequency @default(ANNUAL)
+  nextDueDate    DateTime
+  active         Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+
+  records        ComplianceRecord[]
+
+  @@index([organizationId, active])
+  @@map("compliance_requirements")
+}
+
+// One occurrence of a requirement coming due. Generated/advanced when the
+// previous occurrence is marked complete (see lib/compliance.ts), so the
+// requirement always has exactly one open (non-COMPLETE) record at a time.
+model ComplianceRecord {
+  id                String                 @id @default(cuid())
+  requirementId     String
+  requirement       ComplianceRequirement  @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  organizationId    String
+  organization      Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  dueDate           DateTime
+  status            ComplianceRecordStatus @default(UPCOMING)
+  completedAt       DateTime?
+  completedById     String?
+  notes             String?
+  createdAt         DateTime               @default(now())
+
+  @@index([organizationId, status, dueDate])
+  @@map("compliance_records")
+}
+
+// ---------- AUDIT LOG ----------
+
+
+// Append-only trail of sensitive actions (leave decisions, salary/status
+// changes, payroll runs). Never updated or deleted, so this is deliberately
+// a flat denormalized record rather than relations that could cascade-delete
+// it away — the log must survive even if the actor or subject is later removed.
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  actorUserId    String   // who performed the action
+  actorEmail     String   // denormalized so the log reads even if the user is deleted later
+  action         String   // e.g. "leave.approve", "employee.update", "payroll.generate"
+  targetType     String   // e.g. "Employee", "LeaveRequest"
+  targetId       String?
+  metadata       Json?    // small structured context (old/new values, counts, etc.)
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, action])
+  @@map("audit_logs")
+}
+
+// ---------- DOCUMENTS ----------
+
+// Contracts, IDs, certificates, offer letters. Stores a reference to the
+// blob (local disk in dev via lib/storage.ts, swap for S3/GCS in prod) —
+// never the file bytes themselves in Postgres.
+model EmployeeDocument {
+  id           String   @id @default(cuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  title        String
+  fileUrl      String
+  mimeType     String
+  sizeBytes    Int
+  uploadedById String?  // Employee id of the uploader, if they have a profile
+  createdAt    DateTime @default(now())
+
+  @@index([employeeId])
+  @@map("employee_documents")
+}
+
+// ---------- AUTH: PASSWORD RESET ----------
+
+// Single-use, short-lived tokens for the forgot-password flow. We store a
+// hash of the token, never the raw value — the raw token only ever exists
+// in the emailed link and the request body, matching how session secrets
+// are normally handled.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+// ---------- ONBOARDING ----------
+
+// A simple per-employee checklist, seeded with a default set of tasks when
+// the employee record is created. Deliberately flat (no separate "template"
+// model) — extend to per-org templates later if the default list needs to
+// vary by department or org.
+// The per-organization template new hires' checklists are copied from at
+// creation time (see lib/onboarding.ts). Editing this later never touches
+// OnboardingTask rows already assigned to existing employees — it only
+// changes what future hires get.
+model OnboardingTaskTemplate {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  order          Int          @default(0)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, order])
+  @@map("onboarding_task_templates")
+}
+
+model OnboardingTask {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  order       Int       @default(0)
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([employeeId])
+  @@map("onboarding_tasks")
+}
+
+// ---------- NOTIFICATIONS ----------
+
+enum NotificationType {
+  LEAVE_REQUEST_SUBMITTED
+  LEAVE_REQUEST_DECIDED
+  ONBOARDING_ASSIGNED
+  EMPLOYEE_CREATED
+  APPRAISAL_SUBMITTED
+  CONTRACT_SUMMARY_GENERATED
+  INTERVIEW_SCHEDULED
+  OFFER_EXTENDED
+  APPLICATION_STAGE_CHANGED
+  KPI_AT_RISK
+  APPRAISAL_MEETING_SCHEDULED
+  FEEDBACK_REQUESTED
+  TRAINING_ASSIGNED
+  TRAINING_OVERDUE
+  COMPLIANCE_DEADLINE
+  GENERAL
+}
+
+// In-app notifications, polled by the Topbar bell. Kept per-User (not
+// per-Employee) since ADMIN/HR accounts without an Employee profile also
+// need to receive things like "new leave request pending review".
+model Notification {
+  id             String           @id @default(cuid())
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  type           NotificationType @default(GENERAL)
+  title          String
+  body           String?
+  link           String?          // relative in-app path to navigate to on click
+  read           Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+
+  @@index([userId, read])
+  @@index([organizationId, createdAt])
+  @@map("notifications")
+}
+
+// ---------- PAYROLL (minimal, extensible) ----------
+
+model Payslip {
+  id            String   @id @default(cuid())
+  employeeId    String
+  employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  periodMonth   Int      // 1-12
+  periodYear    Int
+  grossPay      Decimal  @db.Decimal(12, 2)
+  deductions    Decimal  @db.Decimal(12, 2) @default(0)
+  netPay        Decimal  @db.Decimal(12, 2)
+  generatedAt   DateTime @default(now())
+
+  @@unique([employeeId, periodMonth, periodYear])
+  @@map("payslips")
+}
