@@ -1,7 +1,9 @@
 import { getServerSession } from "next-auth";
+import { Users, UserCheck, CalendarClock, Clock3, Wallet, ListChecks, FileWarning } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import StatCard from "@/components/StatCard";
+import { PageHeader } from "@/components/ui/page-header";
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -37,15 +39,20 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-gray-900 mb-6">Dashboard</h1>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Employees" value={totalEmployees} />
-        <StatCard label="Active" value={activeEmployees} />
-        <StatCard label="Pending Leave Requests" value={pendingLeaves} hint="Needs review" />
-        <StatCard label="Checked In Today" value={todayPresent} />
-        <StatCard label="Payslips This Month" value={payslipsThisMonth} />
-        <StatCard label="Onboarding In Progress" value={onboardingInProgress} />
-        <StatCard label="Contracts Ending (30d)" value={contractsEndingSoon} hint="Consider an appraisal + summary" />
+      <PageHeader title="Dashboard" description="Your organization at a glance." />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="Total Employees" value={totalEmployees} icon={Users} />
+        <StatCard label="Active" value={activeEmployees} icon={UserCheck} />
+        <StatCard label="Pending Leave Requests" value={pendingLeaves} hint="Needs review" icon={CalendarClock} />
+        <StatCard label="Checked In Today" value={todayPresent} icon={Clock3} />
+        <StatCard label="Payslips This Month" value={payslipsThisMonth} icon={Wallet} />
+        <StatCard label="Onboarding In Progress" value={onboardingInProgress} icon={ListChecks} />
+        <StatCard
+          label="Contracts Ending (30d)"
+          value={contractsEndingSoon}
+          hint="Consider an appraisal + summary"
+          icon={FileWarning}
+        />
       </div>
     </div>
   );

@@ -17,6 +17,7 @@ export const permissions = {
   "appraisal:create": ["ADMIN", "HR", "MANAGER"],
   "appraisal:view_all": ["ADMIN", "HR"],
   "appraisal:manage_summary": ["ADMIN", "HR"],
+  "appraisal:cycle_manage": ["ADMIN", "HR"],
   "recruitment:manage": ["ADMIN", "HR"],
   "recruitment:view": ["ADMIN", "HR", "MANAGER"],
   "kpi:manage": ["ADMIN", "HR", "MANAGER"],
@@ -55,4 +56,18 @@ export async function canActOnDepartment(
   if (role !== "MANAGER" || !employeeId || !targetDepartmentId) return false;
   const ids = await managedDepartmentIds(employeeId);
   return ids.includes(targetDepartmentId);
+}
+
+// True if `actorEmployeeId` (acting with `role`) may view/act on a Kpi/Goal
+// owned by `kpiEmployeeId` in department `kpiDepartmentId` — the owner
+// themselves, or anyone who can manage KPIs for that department. Shared by
+// /api/kpis/[id] and /api/kpis/[id]/check-ins so both routes apply the same rule.
+export async function canActOnKpi(
+  role: Role | string,
+  actorEmployeeId: string | null,
+  kpiEmployeeId: string,
+  kpiDepartmentId: string | null
+): Promise<boolean> {
+  if (actorEmployeeId === kpiEmployeeId) return true;
+  return can(role, "kpi:manage") && (await canActOnDepartment(role, actorEmployeeId, kpiDepartmentId));
 }

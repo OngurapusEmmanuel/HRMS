@@ -2,6 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/alert";
 
 type Props = {
   employee: {
@@ -57,75 +63,74 @@ export default function EmployeeEditForm({ employee, departments }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-4 text-sm">
-      <h2 className="font-semibold text-gray-900">Edit Employee</h2>
+    <Card>
+      <CardHeader>
+        <CardTitle>Edit Employee</CardTitle>
+      </CardHeader>
+      <form onSubmit={handleSubmit}>
+        <CardContent className="grid grid-cols-2 gap-4">
+          <div>
+            <Label>Job title</Label>
+            <Input value={form.jobTitle} onChange={(e) => setForm({ ...form, jobTitle: e.target.value })} />
+          </div>
+          <div>
+            <Label>Status</Label>
+            <Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+              {STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <Label>Department</Label>
+            <Select value={form.departmentId} onChange={(e) => setForm({ ...form, departmentId: e.target.value })}>
+              <option value="">Unassigned</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <Label>Annual salary</Label>
+            <Input
+              type="number"
+              step="0.01"
+              value={form.baseSalary}
+              onChange={(e) => setForm({ ...form, baseSalary: e.target.value })}
+            />
+          </div>
+          <div className="col-span-2">
+            <Label>Contract end date</Label>
+            <Input
+              type="date"
+              value={form.contractEndDate}
+              onChange={(e) => setForm({ ...form, contractEndDate: e.target.value })}
+              className="max-w-xs"
+            />
+            <p className="mt-1 text-xs text-muted">Leave blank for a permanent/open-ended contract.</p>
+          </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-gray-700 mb-1">Job title</label>
-          <input
-            value={form.jobTitle}
-            onChange={(e) => setForm({ ...form, jobTitle: e.target.value })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2"
-          />
-        </div>
-        <div>
-          <label className="block text-gray-700 mb-1">Status</label>
-          <select
-            value={form.status}
-            onChange={(e) => setForm({ ...form, status: e.target.value })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2"
-          >
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-gray-700 mb-1">Department</label>
-          <select
-            value={form.departmentId}
-            onChange={(e) => setForm({ ...form, departmentId: e.target.value })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2"
-          >
-            <option value="">Unassigned</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-gray-700 mb-1">Annual salary</label>
-          <input
-            type="number"
-            step="0.01"
-            value={form.baseSalary}
-            onChange={(e) => setForm({ ...form, baseSalary: e.target.value })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2"
-          />
-        </div>
-        <div>
-          <label className="block text-gray-700 mb-1">Contract end date</label>
-          <input
-            type="date"
-            value={form.contractEndDate}
-            onChange={(e) => setForm({ ...form, contractEndDate: e.target.value })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2"
-          />
-          <p className="text-xs text-gray-400 mt-1">Leave blank for a permanent/open-ended contract.</p>
-        </div>
-      </div>
-
-      {error && <p className="text-red-600 text-xs">{error}</p>}
-      {saved && !error && <p className="text-green-600 text-xs">Saved.</p>}
-
-      <button
-        type="submit"
-        disabled={loading}
-        className="bg-brand-500 hover:bg-brand-600 text-white rounded-lg px-4 py-2 font-medium disabled:opacity-60"
-      >
-        {loading ? "Saving..." : "Save Changes"}
-      </button>
-    </form>
+          {error && (
+            <div className="col-span-2">
+              <Alert variant="error">{error}</Alert>
+            </div>
+          )}
+          {saved && !error && (
+            <div className="col-span-2">
+              <Alert variant="success">Saved.</Alert>
+            </div>
+          )}
+        </CardContent>
+        <CardFooter>
+          <Button type="submit" loading={loading}>
+            {loading ? "Saving..." : "Save Changes"}
+          </Button>
+        </CardFooter>
+      </form>
+    </Card>
   );
 }

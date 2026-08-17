@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Check, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function LeaveActions({ leaveId }: { leaveId: string }) {
   const router = useRouter();
@@ -19,21 +21,27 @@ export default function LeaveActions({ leaveId }: { leaveId: string }) {
   }
 
   return (
-    <div className="space-x-2">
-      <button
-        onClick={() => review("APPROVED")}
+    <div className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        leftIcon={<Check className="h-3.5 w-3.5" />}
+        loading={loading === "APPROVED"}
         disabled={loading !== null}
-        className="text-green-600 hover:underline text-xs font-medium disabled:opacity-50"
+        onClick={() => review("APPROVED")}
       >
         {loading === "APPROVED" ? "Approving..." : "Approve"}
-      </button>
-      <button
-        onClick={() => review("REJECTED")}
+      </Button>
+      <Button
+        variant="destructive"
+        size="sm"
+        leftIcon={<X className="h-3.5 w-3.5" />}
+        loading={loading === "REJECTED"}
         disabled={loading !== null}
-        className="text-red-600 hover:underline text-xs font-medium disabled:opacity-50"
+        onClick={() => review("REJECTED")}
       >
         {loading === "REJECTED" ? "Rejecting..." : "Reject"}
-      </button>
+      </Button>
     </div>
   );
 }

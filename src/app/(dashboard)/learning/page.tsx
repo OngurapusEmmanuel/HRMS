@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import NewCourseButton from "@/components/learning/NewCourseButton";
 import CourseCatalog from "@/components/learning/CourseCatalog";
+import { PageHeader } from "@/components/ui/page-header";
 
 export default async function LearningPage() {
   const session = await getServerSession(authOptions);
@@ -25,10 +26,11 @@ export default async function LearningPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold text-gray-900">Learning & Development</h1>
-        {can(role, "training:manage") && <NewCourseButton />}
-      </div>
+      <PageHeader
+        title="Learning & Development"
+        description="Browse the course catalog and track your enrollments."
+        actions={can(role, "training:manage") && <NewCourseButton />}
+      />
 
       <CourseCatalog
         initialCourses={courses.map((c) => ({

@@ -1,8 +1,14 @@
+import { Clock } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { managedDepartmentIds } from "@/lib/rbac";
 import AttendanceActions from "@/components/AttendanceActions";
+import { PageHeader } from "@/components/ui/page-header";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { attendanceStatusVariant } from "@/lib/badge-variants";
+import { TableContainer, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 export default async function AttendancePage() {
   const session = await getServerSession(authOptions);
@@ -30,36 +36,42 @@ export default async function AttendancePage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold text-gray-900">Attendance — Today</h1>
-        {role === "EMPLOYEE" && <AttendanceActions />}
-      </div>
+      <PageHeader
+        title="Attendance — Today"
+        actions={role === "EMPLOYEE" && <AttendanceActions />}
+      />
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-gray-500 text-left">
-            <tr>
-              <th className="px-4 py-3 font-medium">Employee</th>
-              <th className="px-4 py-3 font-medium">Check In</th>
-              <th className="px-4 py-3 font-medium">Check Out</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
+      <TableContainer>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Employee</TableHead>
+              <TableHead>Check In</TableHead>
+              <TableHead>Check Out</TableHead>
+              <TableHead>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {records.map((r) => (
-              <tr key={r.id}>
-                <td className="px-4 py-3">{r.employee.firstName} {r.employee.lastName}</td>
-                <td className="px-4 py-3 text-gray-500">{r.checkIn ? r.checkIn.toLocaleTimeString() : "—"}</td>
-                <td className="px-4 py-3 text-gray-500">{r.checkOut ? r.checkOut.toLocaleTimeString() : "—"}</td>
-                <td className="px-4 py-3">{r.status}</td>
-              </tr>
+              <TableRow key={r.id}>
+                <TableCell>{r.employee.firstName} {r.employee.lastName}</TableCell>
+                <TableCell className="text-secondary">{r.checkIn ? r.checkIn.toLocaleTimeString() : "—"}</TableCell>
+                <TableCell className="text-secondary">{r.checkOut ? r.checkOut.toLocaleTimeString() : "—"}</TableCell>
+                <TableCell>
+                  <Badge variant={attendanceStatusVariant[r.status] ?? "neutral"}>{r.status}</Badge>
+                </TableCell>
+              </TableRow>
             ))}
-            {records.length === 0 && (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">No attendance records for today.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+        {records.length === 0 && (
+          <EmptyState
+            icon={<Clock className="h-8 w-8" />}
+            title="No attendance records"
+            description="No attendance records for today."
+          />
+        )}
+      </TableContainer>
     </div>
   );
 }

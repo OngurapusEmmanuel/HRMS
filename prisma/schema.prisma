@@ -88,10 +88,22 @@ enum OfferStatus {
 // ---------- PERFORMANCE ENUMS ----------
 
 enum KpiStatus {
+  NOT_STARTED
   ON_TRACK
   AT_RISK
   OFF_TRACK
   COMPLETED
+  CANCELLED
+}
+
+enum AppraisalCycleStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum AppraisalReviewType {
+  SELF
+  MANAGER
 }
 
 enum MeetingStatus {
@@ -137,6 +149,16 @@ enum ComplianceRecordStatus {
   OVERDUE
 }
 
+// ---------- DOCUMENT ENUMS ----------
+
+enum DocumentType {
+  CONTRACT
+  POLICY
+  IDENTITY
+  CERTIFICATE
+  OTHER
+}
+
 // ---------- CORE MODELS ----------
 
 // One row per company using the platform (multi-tenant from day one).
@@ -152,7 +174,9 @@ model Organization {
   leaveBalancesPolicy LeavePolicy[]
   taxBrackets  TaxBracket[]
   onboardingTaskTemplates OnboardingTaskTemplate[]
+  offboardingTaskTemplates OffboardingTaskTemplate[]
   appraisals   Appraisal[]
+  appraisalCycles AppraisalCycle[]
   contractSummaries ContractSummary[]
   jobPostings  JobPosting[]
   candidates   Candidate[]
@@ -197,6 +221,7 @@ model Department {
   manager        Employee?    @relation("DepartmentManager", fields: [managerId], references: [id])
   employees      Employee[]   @relation("DepartmentEmployees")
   jobPostings    JobPosting[]
+  appraisalCycles AppraisalCycle[]
   createdAt      DateTime     @default(now())
 
   @@unique([organizationId, name])
@@ -235,6 +260,7 @@ model Employee {
   payslips        Payslip[]
   documents       EmployeeDocument[]
   onboardingTasks OnboardingTask[]
+  offboardingTasks OffboardingTask[]
   appraisalsReceived Appraisal[]    @relation("AppraisalSubject")
   appraisalsGiven    Appraisal[]    @relation("AppraisalReviewer")
   contractSummary    ContractSummary?
@@ -350,6 +376,12 @@ model Appraisal {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  // Null on every appraisal filed before cycles existed, and on any ad-hoc
+  // appraisal filed outside a cycle (both remain fully supported).
+  cycleId        String?
+  cycle          AppraisalCycle? @relation(fields: [cycleId], references: [id], onDelete: SetNull)
+  reviewType     AppraisalReviewType?
+
   periodStart    DateTime
   periodEnd      DateTime
   scores         Json         // { "Communication": 4, "Technical Skills": 5, ... }
@@ -364,7 +396,36 @@ model Appraisal {
 
   @@index([employeeId, periodEnd])
   @@index([organizationId, periodEnd])
+  @@index([cycleId, reviewType])
   @@map("appraisals")
+}
+
+// A named review cycle (e.g. "H2 2026 Growth Review") that appraisals can be
+// tagged against, giving HR a completion dashboard instead of only an ad-hoc
+// per-employee history. Deliberately does NOT introduce a draft/reopen state
+// machine — an in-cycle appraisal is still created complete-in-one-shot, same
+// as before; the cycle only tags which appraisals belong together and what
+// review type (self vs manager) each one is. `departmentId` null = org-wide
+// population; set = scoped to one department.
+model AppraisalCycle {
+  id                String               @id @default(cuid())
+  organizationId    String
+  organization      Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name              String
+  periodStart       DateTime
+  periodEnd         DateTime
+  dueAt             DateTime
+  departmentId      String?
+  department        Department?          @relation(fields: [departmentId], references: [id])
+  requireSelfReview Boolean              @default(true)
+  status            AppraisalCycleStatus @default(ACTIVE)
+  createdById       String               // User id who created the cycle
+  createdAt         DateTime             @default(now())
+
+  appraisals        Appraisal[]
+
+  @@index([organizationId, status])
+  @@map("appraisal_cycles")
 }
 
 // The rollup generated when an employee's contract ends — either because
@@ -521,8 +582,33 @@ model Kpi {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
+  // Optional org -> team -> individual linking, e.g. an individual goal
+  // cascading from a team or company-level one. Null = a standalone goal.
+  parentGoalId   String?
+  parent         Kpi?      @relation("GoalCascade", fields: [parentGoalId], references: [id])
+  children       Kpi[]     @relation("GoalCascade")
+
+  checkIns       KpiCheckIn[]
+
   @@index([employeeId, periodEnd])
+  @@index([parentGoalId])
   @@map("kpis")
+}
+
+// Progress-update history for a Kpi/Goal — free-text note plus optional
+// evidence, so "current" changing over time has an audit trail instead of
+// being silently overwritten in place.
+model KpiCheckIn {
+  id          String   @id @default(cuid())
+  kpiId       String
+  kpi         Kpi      @relation(fields: [kpiId], references: [id], onDelete: Cascade)
+  note        String
+  evidenceUrl String?
+  createdById String   // Employee id who logged the check-in
+  createdAt   DateTime @default(now())
+
+  @@index([kpiId, createdAt])
+  @@map("kpi_check_ins")
 }
 
 // A scheduled appraisal conversation — distinct from the Appraisal record
@@ -677,15 +763,17 @@ model AuditLog {
 // blob (local disk in dev via lib/storage.ts, swap for S3/GCS in prod) —
 // never the file bytes themselves in Postgres.
 model EmployeeDocument {
-  id           String   @id @default(cuid())
+  id           String       @id @default(cuid())
   employeeId   String
-  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee     Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   title        String
+  type         DocumentType @default(OTHER)
   fileUrl      String
   mimeType     String
   sizeBytes    Int
-  uploadedById String?  // Employee id of the uploader, if they have a profile
-  createdAt    DateTime @default(now())
+  expiresAt    DateTime?    // e.g. a work permit or certificate with a validity date; null = doesn't expire
+  uploadedById String?      // Employee id of the uploader, if they have a profile
+  createdAt    DateTime     @default(now())
 
   @@index([employeeId])
   @@map("employee_documents")
@@ -748,6 +836,40 @@ model OnboardingTask {
   @@map("onboarding_tasks")
 }
 
+// ---------- OFFBOARDING ----------
+
+// Mirrors OnboardingTaskTemplate exactly — a per-organization default
+// checklist, copied onto an employee's own OffboardingTask rows when they're
+// terminated (see lib/offboarding.ts). Editing this later never touches
+// checklists already assigned to employees already offboarded.
+model OffboardingTaskTemplate {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  order          Int          @default(0)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, order])
+  @@map("offboarding_task_templates")
+}
+
+model OffboardingTask {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  order       Int       @default(0)
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([employeeId])
+  @@map("offboarding_tasks")
+}
+
 // ---------- NOTIFICATIONS ----------
 
 enum NotificationType {
@@ -766,6 +888,8 @@ enum NotificationType {
   TRAINING_ASSIGNED
   TRAINING_OVERDUE
   COMPLIANCE_DEADLINE
+  LEAVE_UPCOMING
+  LEAVE_LOW_BALANCE
   GENERAL
 }
 

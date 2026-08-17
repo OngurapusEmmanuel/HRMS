@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { LogIn, LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function AttendanceActions() {
   const router = useRouter();
@@ -23,21 +25,26 @@ export default function AttendanceActions() {
 
   return (
     <div className="flex items-center gap-2">
-      {message && <span className="text-xs text-red-600">{message}</span>}
-      <button
-        onClick={() => hit("checkin")}
+      {message && <span className="text-xs text-danger-500">{message}</span>}
+      <Button
+        size="sm"
+        leftIcon={<LogIn className="h-4 w-4" />}
+        loading={loading === "in"}
         disabled={loading !== null}
-        className="bg-brand-500 hover:bg-brand-600 text-white text-sm rounded-lg px-4 py-2 disabled:opacity-60"
+        onClick={() => hit("checkin")}
       >
         {loading === "in" ? "Checking in..." : "Check In"}
-      </button>
-      <button
-        onClick={() => hit("checkout")}
+      </Button>
+      <Button
+        variant="secondary"
+        size="sm"
+        leftIcon={<LogOut className="h-4 w-4" />}
+        loading={loading === "out"}
         disabled={loading !== null}
-        className="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm rounded-lg px-4 py-2 disabled:opacity-60"
+        onClick={() => hit("checkout")}
       >
         {loading === "out" ? "Checking out..." : "Check Out"}
-      </button>
+      </Button>
     </div>
   );
 }

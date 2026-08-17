@@ -2,6 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ShieldCheck } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { TableContainer, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { complianceStatusVariant } from "@/lib/badge-variants";
 
 type Requirement = {
   id: string;
@@ -10,12 +16,6 @@ type Requirement = {
   frequency: string;
   nextDueDate: string;
   currentRecord: { id: string; status: string; dueDate: string } | null;
-};
-
-const STATUS_STYLES: Record<string, string> = {
-  UPCOMING: "bg-blue-100 text-blue-700",
-  OVERDUE: "bg-red-100 text-red-700",
-  COMPLETE: "bg-green-100 text-green-700",
 };
 
 export default function ComplianceList({ initialRequirements }: { initialRequirements: Requirement[] }) {
@@ -36,50 +36,53 @@ export default function ComplianceList({ initialRequirements }: { initialRequire
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-50 text-gray-500 text-left">
-          <tr>
-            <th className="px-4 py-3 font-medium">Requirement</th>
-            <th className="px-4 py-3 font-medium">Jurisdiction</th>
-            <th className="px-4 py-3 font-medium">Frequency</th>
-            <th className="px-4 py-3 font-medium">Due</th>
-            <th className="px-4 py-3 font-medium">Status</th>
-            <th className="px-4 py-3 font-medium">Action</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
+    <TableContainer>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Requirement</TableHead>
+            <TableHead>Jurisdiction</TableHead>
+            <TableHead>Frequency</TableHead>
+            <TableHead>Due</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Action</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {requirements.map((r) => (
-            <tr key={r.id} className="hover:bg-gray-50">
-              <td className="px-4 py-3 font-medium text-gray-900">{r.title}</td>
-              <td className="px-4 py-3 text-gray-500">{r.jurisdiction ?? "—"}</td>
-              <td className="px-4 py-3 text-gray-500">{r.frequency.replace("_", "-").toLowerCase()}</td>
-              <td className="px-4 py-3 text-gray-500">{r.currentRecord ? new Date(r.currentRecord.dueDate).toLocaleDateString() : "—"}</td>
-              <td className="px-4 py-3">
+            <TableRow key={r.id}>
+              <TableCell className="font-medium text-foreground">{r.title}</TableCell>
+              <TableCell className="text-secondary">{r.jurisdiction ?? "—"}</TableCell>
+              <TableCell className="text-secondary">{r.frequency.replace("_", "-").toLowerCase()}</TableCell>
+              <TableCell className="text-secondary">{r.currentRecord ? new Date(r.currentRecord.dueDate).toLocaleDateString() : "—"}</TableCell>
+              <TableCell>
                 {r.currentRecord && (
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[r.currentRecord.status]}`}>
-                    {r.currentRecord.status}
-                  </span>
+                  <Badge variant={complianceStatusVariant[r.currentRecord.status] ?? "neutral"}>{r.currentRecord.status}</Badge>
                 )}
-              </td>
-              <td className="px-4 py-3">
+              </TableCell>
+              <TableCell>
                 {r.currentRecord && r.currentRecord.status !== "COMPLETE" && (
-                  <button
+                  <Button
+                    variant="link"
+                    size="sm"
                     onClick={() => markComplete(r.currentRecord!.id, r.id)}
-                    disabled={loadingId === r.currentRecord.id}
-                    className="text-brand-600 hover:underline text-xs font-medium disabled:opacity-50"
+                    loading={loadingId === r.currentRecord.id}
                   >
                     {loadingId === r.currentRecord.id ? "Saving..." : "Mark Complete"}
-                  </button>
+                  </Button>
                 )}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-          {requirements.length === 0 && (
-            <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No compliance requirements tracked yet.</td></tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+        </TableBody>
+      </Table>
+      {requirements.length === 0 && (
+        <EmptyState
+          icon={<ShieldCheck className="h-8 w-8" />}
+          title="No compliance requirements tracked yet"
+          description="Add a requirement to start tracking statutory deadlines."
+        />
+      )}
+    </TableContainer>
   );
 }

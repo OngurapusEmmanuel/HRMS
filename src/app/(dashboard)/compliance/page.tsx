@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
+import { Download } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import { reconcileOverdueRecords } from "@/lib/compliance";
 import NewRequirementButton from "@/components/compliance/NewRequirementButton";
 import ComplianceList from "@/components/compliance/ComplianceList";
+import { PageHeader } from "@/components/ui/page-header";
+import { buttonVariants } from "@/components/ui/button";
 
 export default async function CompliancePage() {
   const session = await getServerSession(authOptions);
@@ -23,14 +26,19 @@ export default async function CompliancePage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-1">
-        <h1 className="text-xl font-semibold text-gray-900">Compliance</h1>
-        <div className="flex items-center gap-3">
-          <a href="/api/compliance-requirements/export" className="text-sm text-brand-600 hover:underline">Export CSV</a>
-          <NewRequirementButton />
-        </div>
-      </div>
-      <p className="text-sm text-gray-500 mb-6">Statutory deadlines and labor law obligations tracked for your organization.</p>
+      <PageHeader
+        title="Compliance"
+        description="Statutory deadlines and labor law obligations tracked for your organization."
+        actions={
+          <>
+            <a href="/api/compliance-requirements/export" className={buttonVariants({ variant: "outline", size: "sm" })}>
+              <Download className="h-4 w-4" />
+              Export CSV
+            </a>
+            <NewRequirementButton />
+          </>
+        }
+      />
 
       <ComplianceList
         initialRequirements={requirements.map((r) => ({

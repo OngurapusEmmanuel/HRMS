@@ -11,6 +11,7 @@ export const config = {
     "/leaves/:path*",
     "/attendance/:path*",
     "/appraisals/:path*",
+    "/goals/:path*",
     "/feedback/:path*",
     "/learning/:path*",
     "/payroll/:path*",

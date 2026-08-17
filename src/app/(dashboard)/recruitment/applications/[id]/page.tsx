@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import ApplicationDetail from "@/components/recruitment/ApplicationDetail";
+import { PageHeader } from "@/components/ui/page-header";
 
 export default async function ApplicationDetailPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -28,17 +29,21 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
   ]);
   if (!application) notFound();
 
+  const candidateName = `${application.candidate.firstName} ${application.candidate.lastName}`;
+
   return (
     <div className="max-w-2xl">
-      <p className="text-sm text-gray-500 mb-1">{application.jobPosting.title}</p>
-      <h1 className="text-xl font-semibold text-gray-900 mb-1">
-        {application.candidate.firstName} {application.candidate.lastName}
-      </h1>
-      <p className="text-sm text-gray-500 mb-6">
-        {application.candidate.email}
-        {application.candidate.phone ? ` · ${application.candidate.phone}` : ""}
-        {application.candidate.source ? ` · via ${application.candidate.source}` : ""}
-      </p>
+      <PageHeader
+        title={candidateName}
+        description={`${application.candidate.email}${application.candidate.phone ? ` · ${application.candidate.phone}` : ""}${
+          application.candidate.source ? ` · via ${application.candidate.source}` : ""
+        }`}
+        breadcrumb={[
+          { label: "Recruitment", href: "/recruitment" },
+          { label: application.jobPosting.title, href: `/recruitment/${application.jobPosting.id}` },
+          { label: candidateName },
+        ]}
+      />
 
       <ApplicationDetail
         applicationId={application.id}

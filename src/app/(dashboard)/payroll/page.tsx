@@ -1,8 +1,13 @@
+import { Download, Wallet } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can, managedDepartmentIds } from "@/lib/rbac";
 import GeneratePayrollButton from "@/components/GeneratePayrollButton";
+import { PageHeader } from "@/components/ui/page-header";
+import { buttonVariants } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { TableContainer, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 function money(n: unknown) {
   return `$${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -34,51 +39,55 @@ export default async function PayrollPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold text-gray-900">Payroll</h1>
-        <div className="flex items-center gap-3">
-          {can(role, "payroll:manage") && (
-            <a href="/api/payroll/export" className="text-sm text-brand-600 hover:underline">
-              Export CSV
-            </a>
-          )}
-          {can(role, "payroll:manage") && <GeneratePayrollButton />}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-gray-500 text-left">
-            <tr>
-              {role !== "EMPLOYEE" && <th className="px-4 py-3 font-medium">Employee</th>}
-              <th className="px-4 py-3 font-medium">Period</th>
-              <th className="px-4 py-3 font-medium">Gross</th>
-              <th className="px-4 py-3 font-medium">Deductions</th>
-              <th className="px-4 py-3 font-medium">Net Pay</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {payslips.map((p) => (
-              <tr key={p.id}>
-                {role !== "EMPLOYEE" && (
-                  <td className="px-4 py-3">{p.employee.firstName} {p.employee.lastName}</td>
-                )}
-                <td className="px-4 py-3 text-gray-500">{p.periodMonth}/{p.periodYear}</td>
-                <td className="px-4 py-3">{money(p.grossPay)}</td>
-                <td className="px-4 py-3 text-red-500">-{money(p.deductions)}</td>
-                <td className="px-4 py-3 font-medium">{money(p.netPay)}</td>
-              </tr>
-            ))}
-            {payslips.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
-                  No payslips generated yet.
-                </td>
-              </tr>
+      <PageHeader
+        title="Payroll"
+        description="Generated payslips for your organization."
+        actions={
+          <>
+            {can(role, "payroll:manage") && (
+              <a href="/api/payroll/export" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                <Download className="h-4 w-4" />
+                Export CSV
+              </a>
             )}
-          </tbody>
-        </table>
-      </div>
+            {can(role, "payroll:manage") && <GeneratePayrollButton />}
+          </>
+        }
+      />
+
+      <TableContainer>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {role !== "EMPLOYEE" && <TableHead>Employee</TableHead>}
+              <TableHead>Period</TableHead>
+              <TableHead className="text-right">Gross</TableHead>
+              <TableHead className="text-right">Deductions</TableHead>
+              <TableHead className="text-right">Net Pay</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {payslips.map((p) => (
+              <TableRow key={p.id}>
+                {role !== "EMPLOYEE" && (
+                  <TableCell>{p.employee.firstName} {p.employee.lastName}</TableCell>
+                )}
+                <TableCell className="text-secondary">{p.periodMonth}/{p.periodYear}</TableCell>
+                <TableCell className="text-right tabular-nums">{money(p.grossPay)}</TableCell>
+                <TableCell className="text-right tabular-nums text-danger-500">-{money(p.deductions)}</TableCell>
+                <TableCell className="text-right tabular-nums font-medium">{money(p.netPay)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        {payslips.length === 0 && (
+          <EmptyState
+            icon={<Wallet className="h-8 w-8" />}
+            title="No payslips generated yet"
+            description={can(role, "payroll:manage") ? "Generate payroll for a period to see payslips here." : "Check back once payroll has been generated."}
+          />
+        )}
+      </TableContainer>
     </div>
   );
 }

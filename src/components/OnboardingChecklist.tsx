@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { cn } from "@/lib/cn";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 type Task = {
   id: string;
@@ -38,37 +40,44 @@ export default function OnboardingChecklist({
   if (tasks.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
-      <div className="flex items-center justify-between mb-1">
-        <h2 className="font-semibold text-gray-900">Onboarding Checklist</h2>
-        <span className="text-sm text-gray-500">{completedCount}/{tasks.length} done</span>
-      </div>
-      <div className="w-full h-1.5 bg-gray-100 rounded-full mb-4 overflow-hidden">
-        <div className="h-full bg-brand-500 transition-all" style={{ width: `${progress}%` }} />
-      </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Onboarding Checklist</CardTitle>
+        <span className="text-sm text-secondary">
+          {completedCount}/{tasks.length} done
+        </span>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
+          <div className="h-full bg-primary-500 transition-all" style={{ width: `${progress}%` }} />
+        </div>
 
-      <div className="space-y-2">
-        {tasks.map((t) => (
-          <label
-            key={t.id}
-            className={`flex items-start gap-3 p-2 rounded-lg cursor-pointer hover:bg-gray-50 ${pending === t.id ? "opacity-60" : ""}`}
-          >
-            <input
-              type="checkbox"
-              checked={t.completed}
-              disabled={pending !== null}
-              onChange={() => toggle(t)}
-              className="mt-0.5"
-            />
-            <div>
-              <p className={`text-sm font-medium ${t.completed ? "text-gray-400 line-through" : "text-gray-900"}`}>
-                {t.title}
-              </p>
-              {t.description && <p className="text-xs text-gray-400">{t.description}</p>}
-            </div>
-          </label>
-        ))}
-      </div>
-    </div>
+        <div className="space-y-1">
+          {tasks.map((t) => (
+            <label
+              key={t.id}
+              className={cn(
+                "flex items-start gap-3 rounded-lg p-2 cursor-pointer transition-colors hover:bg-surface-2",
+                pending === t.id && "opacity-60"
+              )}
+            >
+              <input
+                type="checkbox"
+                checked={t.completed}
+                disabled={pending !== null}
+                onChange={() => toggle(t)}
+                className="mt-0.5 h-4 w-4 rounded border-border-strong text-primary-500 focus:ring-primary-500"
+              />
+              <div>
+                <p className={cn("text-sm font-medium", t.completed ? "text-muted line-through" : "text-foreground")}>
+                  {t.title}
+                </p>
+                {t.description && <p className="text-xs text-muted">{t.description}</p>}
+              </div>
+            </label>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

@@ -1,9 +1,17 @@
 import Link from "next/link";
+import { Download, Search, Users } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import AddEmployeeButton from "@/components/AddEmployeeButton";
+import { PageHeader } from "@/components/ui/page-header";
+import { buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { employeeStatusVariant } from "@/lib/badge-variants";
+import { TableContainer, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 const PAGE_SIZE = 20;
 
@@ -48,87 +56,85 @@ export default async function EmployeesPage({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold text-gray-900">Employees</h1>
-        <div className="flex items-center gap-3">
-          {can(role, "employee:update") && (
-            <a href="/api/employees/export" className="text-sm text-brand-600 hover:underline">
-              Export CSV
-            </a>
-          )}
-          {can(role, "employee:create") && <AddEmployeeButton departments={departments} />}
-        </div>
-      </div>
+      <PageHeader
+        title="Employees"
+        description={`${total} employee${total === 1 ? "" : "s"} in your organization.`}
+        actions={
+          <>
+            {can(role, "employee:update") && (
+              <a
+                href="/api/employees/export"
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
+                <Download className="h-4 w-4" />
+                Export CSV
+              </a>
+            )}
+            {can(role, "employee:create") && <AddEmployeeButton departments={departments} />}
+          </>
+        }
+      />
 
-      <form className="mb-4" action="/employees" method="get">
-        <input
-          type="text"
-          name="search"
-          defaultValue={search}
-          placeholder="Search by name or employee code..."
-          className="w-full max-w-sm rounded-lg border border-gray-300 px-3 py-2 text-sm"
-        />
+      <form className="mb-4 max-w-sm" action="/employees" method="get">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+          <Input type="text" name="search" defaultValue={search} placeholder="Search by name or employee code..." className="pl-9" />
+        </div>
       </form>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-gray-500 text-left">
-            <tr>
-              <th className="px-4 py-3 font-medium">Code</th>
-              <th className="px-4 py-3 font-medium">Name</th>
-              <th className="px-4 py-3 font-medium">Job Title</th>
-              <th className="px-4 py-3 font-medium">Department</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
+      <TableContainer>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Code</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Job Title</TableHead>
+              <TableHead>Department</TableHead>
+              <TableHead>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {employees.map((e) => (
-              <tr key={e.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-gray-500">{e.employeeCode}</td>
-                <td className="px-4 py-3">
-                  <Link href={`/employees/${e.id}`} className="text-brand-600 hover:underline font-medium">
+              <TableRow key={e.id}>
+                <TableCell className="text-muted">{e.employeeCode}</TableCell>
+                <TableCell>
+                  <Link href={`/employees/${e.id}`} className="font-medium text-primary-600 hover:underline dark:text-primary-400">
                     {e.firstName} {e.lastName}
                   </Link>
-                </td>
-                <td className="px-4 py-3">{e.jobTitle}</td>
-                <td className="px-4 py-3">{e.department?.name ?? "—"}</td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                      e.status === "ACTIVE" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
-                    }`}
-                  >
-                    {e.status}
-                  </span>
-                </td>
-              </tr>
+                </TableCell>
+                <TableCell>{e.jobTitle}</TableCell>
+                <TableCell>{e.department?.name ?? "—"}</TableCell>
+                <TableCell>
+                  <Badge variant={employeeStatusVariant[e.status] ?? "neutral"}>{e.status}</Badge>
+                </TableCell>
+              </TableRow>
             ))}
-            {employees.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
-                  No employees found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+        {employees.length === 0 && (
+          <EmptyState
+            icon={<Users className="h-8 w-8" />}
+            title="No employees found"
+            description={search ? "Try a different search term." : "Add your first employee to get started."}
+          />
+        )}
+      </TableContainer>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
+        <div className="mt-4 flex items-center justify-between text-sm text-secondary">
           <span>
             Page {page} of {totalPages} · {total} employee{total === 1 ? "" : "s"}
           </span>
           <div className="flex gap-2">
             <Link
               href={`/employees?page=${Math.max(1, page - 1)}${search ? `&search=${encodeURIComponent(search)}` : ""}`}
-              className={`px-3 py-1.5 rounded-lg border border-gray-300 ${page <= 1 ? "pointer-events-none opacity-40" : "hover:bg-gray-50"}`}
+              className={buttonVariants({ variant: "outline", size: "sm", className: page <= 1 ? "pointer-events-none opacity-40" : "" })}
             >
               Previous
             </Link>
             <Link
               href={`/employees?page=${Math.min(totalPages, page + 1)}${search ? `&search=${encodeURIComponent(search)}` : ""}`}
-              className={`px-3 py-1.5 rounded-lg border border-gray-300 ${page >= totalPages ? "pointer-events-none opacity-40" : "hover:bg-gray-50"}`}
+              className={buttonVariants({ variant: "outline", size: "sm", className: page >= totalPages ? "pointer-events-none opacity-40" : "" })}
             >
               Next
             </Link>

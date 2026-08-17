@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import { logAudit } from "@/lib/audit";
 import { generateContractSummary } from "@/lib/appraisal";
+import { assignOffboardingChecklist } from "@/lib/offboarding";
 import { notifyRoles } from "@/lib/notifications";
 
 const updateSchema = z.object({
@@ -137,8 +138,19 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
       body: summary.recommendation ? `Recommendation: ${summary.recommendation.replace(/_/g, " ")}` : undefined,
       link: `/employees/${params.id}`,
     });
+
+    await assignOffboardingChecklist(params.id, organizationId);
+    logAudit({
+      organizationId,
+      actorUserId: (session.user as any).id,
+      actorEmail: session.user.email ?? "",
+      action: "offboarding.checklist_assign",
+      targetType: "OffboardingTask",
+      targetId: params.id,
+      metadata: { employeeId: params.id, trigger: "termination" },
+    });
   } catch (err) {
-    console.error("Failed to auto-generate contract summary on termination:", err);
+    console.error("Failed to auto-generate contract summary / assign offboarding checklist on termination:", err);
   }
 
   return NextResponse.json({ success: true });

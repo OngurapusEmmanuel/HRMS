@@ -1,15 +1,15 @@
 import Link from "next/link";
+import { Briefcase } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import NewJobPostingButton from "@/components/recruitment/NewJobPostingButton";
-
-const STATUS_STYLES: Record<string, string> = {
-  OPEN: "bg-green-100 text-green-700",
-  DRAFT: "bg-gray-100 text-gray-600",
-  CLOSED: "bg-red-100 text-red-700",
-};
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { jobPostingStatusVariant } from "@/lib/badge-variants";
 
 export default async function RecruitmentPage() {
   const session = await getServerSession(authOptions);
@@ -27,28 +27,38 @@ export default async function RecruitmentPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold text-gray-900">Recruitment</h1>
-        {can(role, "recruitment:manage") && <NewJobPostingButton departments={departments} />}
-      </div>
+      <PageHeader
+        title="Recruitment"
+        description={`${postings.length} job posting${postings.length === 1 ? "" : "s"}.`}
+        actions={can(role, "recruitment:manage") && <NewJobPostingButton departments={departments} />}
+      />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {postings.map((p) => (
-          <Link
-            key={p.id}
-            href={`/recruitment/${p.id}`}
-            className="bg-white rounded-xl border border-gray-200 p-5 hover:border-brand-300 transition"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[p.status]}`}>{p.status}</span>
-              <span className="text-xs text-gray-400">{p._count.applications} applicant{p._count.applications === 1 ? "" : "s"}</span>
-            </div>
-            <p className="font-medium text-gray-900">{p.title}</p>
-            <p className="text-sm text-gray-500">{p.department?.name ?? "No department"}</p>
-          </Link>
-        ))}
-        {postings.length === 0 && <p className="text-gray-400 text-sm">No job postings yet.</p>}
-      </div>
+      {postings.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={<Briefcase className="h-8 w-8" />}
+            title="No job postings yet"
+            description="Create a job posting to start building your candidate pipeline."
+          />
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {postings.map((p) => (
+            <Link key={p.id} href={`/recruitment/${p.id}`}>
+              <Card className="p-5 transition-colors hover:border-primary-300">
+                <div className="mb-2 flex items-center justify-between">
+                  <Badge variant={jobPostingStatusVariant[p.status] ?? "neutral"}>{p.status}</Badge>
+                  <span className="text-xs text-muted">
+                    {p._count.applications} applicant{p._count.applications === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <p className="font-medium text-foreground">{p.title}</p>
+                <p className="text-sm text-secondary">{p.department?.name ?? "No department"}</p>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

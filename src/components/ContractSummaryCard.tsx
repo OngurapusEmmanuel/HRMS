@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Alert } from "@/components/ui/alert";
+import { contractRecommendationVariant } from "@/lib/badge-variants";
 
 type Summary = {
   periodStart: string;
@@ -14,13 +18,6 @@ type Summary = {
   recommendation: string | null;
   generatedAt: string;
 } | null;
-
-const RECOMMENDATION_STYLES: Record<string, string> = {
-  RENEW: "bg-green-100 text-green-700",
-  PROMOTE: "bg-blue-100 text-blue-700",
-  EXTEND_PROBATION: "bg-yellow-100 text-yellow-700",
-  DO_NOT_RENEW: "bg-red-100 text-red-700",
-};
 
 export default function ContractSummaryCard({
   employeeId,
@@ -52,59 +49,70 @@ export default function ContractSummaryCard({
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
-      <div className="flex items-center justify-between mb-1">
-        <h2 className="font-semibold text-gray-900">Contract Summary</h2>
+    <Card>
+      <CardHeader>
+        <CardTitle>Contract Summary</CardTitle>
         {canRegenerate && (
           <button
             onClick={handleGenerate}
             disabled={loading}
-            className="text-brand-600 hover:underline text-xs font-medium disabled:opacity-50"
+            className="text-xs font-medium text-primary-600 hover:underline disabled:opacity-50 dark:text-primary-400"
           >
             {loading ? "Generating..." : summary ? "Regenerate" : "Generate now"}
           </button>
         )}
-      </div>
-
-      {!summary && (
-        <p className="text-sm text-gray-400">
-          {canRegenerate
-            ? "Not generated yet — this happens automatically on termination, or generate it manually for a fixed-term contract nearing its end."
-            : "Not generated yet."}
-        </p>
-      )}
-
-      {error && <p className="text-red-600 text-xs mb-2">{error}</p>}
-
-      {summary && (
-        <div className="space-y-3 text-sm mt-3">
-          <div className="flex items-center gap-3">
-            {summary.recommendation && (
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${RECOMMENDATION_STYLES[summary.recommendation] ?? "bg-gray-100 text-gray-600"}`}>
-                {summary.recommendation.replace(/_/g, " ")}
-              </span>
-            )}
-            {summary.averageRating && (
-              <span className="text-gray-700 font-medium">{Number(summary.averageRating).toFixed(2)} / 5 average</span>
-            )}
-            {summary.ratingTrend && <span className="text-gray-400 text-xs">{summary.ratingTrend}</span>}
-          </div>
-
-          <p className="text-gray-500 text-xs">
-            {new Date(summary.periodStart).toLocaleDateString()} – {new Date(summary.periodEnd).toLocaleDateString()} ·{" "}
-            {summary.totalAppraisals} appraisal{summary.totalAppraisals === 1 ? "" : "s"} on file
+      </CardHeader>
+      <CardContent>
+        {!summary && (
+          <p className="text-sm text-muted">
+            {canRegenerate
+              ? "Not generated yet — this happens automatically on termination, or generate it manually for a fixed-term contract nearing its end."
+              : "Not generated yet."}
           </p>
+        )}
 
-          {summary.strengthsSummary && (
-            <p><span className="font-medium text-gray-700">Strengths: </span><span className="text-gray-600">{summary.strengthsSummary}</span></p>
-          )}
-          {summary.improvementAreas && (
-            <p><span className="font-medium text-gray-700">Areas for improvement: </span><span className="text-gray-600">{summary.improvementAreas}</span></p>
-          )}
+        {error && (
+          <div className="mb-2">
+            <Alert variant="error">{error}</Alert>
+          </div>
+        )}
 
-          <p className="text-xs text-gray-400">Generated {new Date(summary.generatedAt).toLocaleString()}</p>
-        </div>
-      )}
-    </div>
+        {summary && (
+          <div className="space-y-3 text-sm">
+            <div className="flex items-center gap-3">
+              {summary.recommendation && (
+                <Badge variant={contractRecommendationVariant[summary.recommendation] ?? "neutral"}>
+                  {summary.recommendation.replace(/_/g, " ")}
+                </Badge>
+              )}
+              {summary.averageRating && (
+                <span className="font-medium text-foreground">{Number(summary.averageRating).toFixed(2)} / 5 average</span>
+              )}
+              {summary.ratingTrend && <span className="text-xs text-muted">{summary.ratingTrend}</span>}
+            </div>
+
+            <p className="text-xs text-secondary">
+              {new Date(summary.periodStart).toLocaleDateString()} – {new Date(summary.periodEnd).toLocaleDateString()} ·{" "}
+              {summary.totalAppraisals} appraisal{summary.totalAppraisals === 1 ? "" : "s"} on file
+            </p>
+
+            {summary.strengthsSummary && (
+              <p>
+                <span className="font-medium text-foreground">Strengths: </span>
+                <span className="text-secondary">{summary.strengthsSummary}</span>
+              </p>
+            )}
+            {summary.improvementAreas && (
+              <p>
+                <span className="font-medium text-foreground">Areas for improvement: </span>
+                <span className="text-secondary">{summary.improvementAreas}</span>
+              </p>
+            )}
+
+            <p className="text-xs text-muted">Generated {new Date(summary.generatedAt).toLocaleString()}</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
 import Modal from "./Modal";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Alert } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { ratingVariant } from "@/lib/badge-variants";
 
 const CRITERIA = ["Communication", "Technical Skills", "Teamwork", "Punctuality", "Initiative"];
 
@@ -12,7 +20,23 @@ function defaultPeriod() {
   return { start: start.toISOString().slice(0, 10), end: now.toISOString().slice(0, 10) };
 }
 
-export default function AppraisalForm({ employeeId }: { employeeId: string }) {
+export default function AppraisalForm({
+  employeeId,
+  cycleId,
+  reviewType,
+  triggerLabel,
+  title,
+}: {
+  employeeId: string;
+  /** Tags the created appraisal against a cycle. Omitted = today's ad-hoc appraisal (unchanged behavior). */
+  cycleId?: string;
+  /** "SELF" enables the self-review authorization branch server-side; "MANAGER" keeps today's manager/HR/admin check. Omitted = legacy ad-hoc. */
+  reviewType?: "SELF" | "MANAGER";
+  /** Customizes the trigger button's label. Defaults to "New Appraisal". */
+  triggerLabel?: string;
+  /** Customizes the modal title. Defaults to "New Performance Appraisal". */
+  title?: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const period = defaultPeriod();
@@ -38,7 +62,11 @@ export default function AppraisalForm({ employeeId }: { employeeId: string }) {
     const res = await fetch(`/api/employees/${employeeId}/appraisals`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        ...(cycleId ? { cycleId } : {}),
+        ...(reviewType ? { reviewType } : {}),
+      }),
     });
     setLoading(false);
     if (!res.ok) {
@@ -52,47 +80,44 @@ export default function AppraisalForm({ employeeId }: { employeeId: string }) {
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="bg-brand-500 hover:bg-brand-600 text-white text-sm rounded-lg px-4 py-2"
-      >
-        New Appraisal
-      </button>
+      <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setOpen(true)}>
+        {triggerLabel ?? "New Appraisal"}
+      </Button>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="New Performance Appraisal">
-        <form onSubmit={handleSubmit} className="space-y-4 text-sm">
+      <Modal open={open} onClose={() => setOpen(false)} title={title ?? "New Performance Appraisal"}>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-gray-700 mb-1">Period start</label>
-              <input
+              <Label>Period start</Label>
+              <Input
                 type="date"
                 required
                 value={form.periodStart}
                 onChange={(e) => setForm((f) => ({ ...f, periodStart: e.target.value }))}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2"
               />
             </div>
             <div>
-              <label className="block text-gray-700 mb-1">Period end</label>
-              <input
+              <Label>Period end</Label>
+              <Input
                 type="date"
                 required
                 value={form.periodEnd}
                 onChange={(e) => setForm((f) => ({ ...f, periodEnd: e.target.value }))}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2"
               />
             </div>
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-gray-700">Scores (1–5)</span>
-              <span className="text-xs text-gray-400">Average: {average.toFixed(2)}</span>
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-sm font-medium text-secondary">Scores (1–5)</span>
+              <div className="flex items-center gap-1.5 text-xs text-muted">
+                Average <Badge variant={ratingVariant(average)}>{average.toFixed(2)}</Badge>
+              </div>
             </div>
             <div className="space-y-2">
               {CRITERIA.map((criterion) => (
                 <div key={criterion} className="flex items-center gap-3">
-                  <span className="w-32 text-gray-600 text-xs">{criterion}</span>
+                  <span className="w-32 text-xs text-secondary">{criterion}</span>
                   <input
                     type="range"
                     min={1}
@@ -102,60 +127,52 @@ export default function AppraisalForm({ employeeId }: { employeeId: string }) {
                     onChange={(e) =>
                       setForm((f) => ({ ...f, scores: { ...f.scores, [criterion]: Number(e.target.value) } }))
                     }
-                    className="flex-1"
+                    className="h-1.5 flex-1 accent-primary-500"
                   />
-                  <span className="w-4 text-right text-gray-700">{form.scores[criterion]}</span>
+                  <span className="w-4 text-right text-sm text-foreground">{form.scores[criterion]}</span>
                 </div>
               ))}
             </div>
           </div>
 
           <div>
-            <label className="block text-gray-700 mb-1">Strengths</label>
-            <textarea
+            <Label>Strengths</Label>
+            <Textarea
               value={form.strengths}
               onChange={(e) => setForm((f) => ({ ...f, strengths: e.target.value }))}
               rows={2}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Areas for improvement</label>
-            <textarea
+            <Label>Areas for improvement</Label>
+            <Textarea
               value={form.areasForImprovement}
               onChange={(e) => setForm((f) => ({ ...f, areasForImprovement: e.target.value }))}
               rows={2}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Goals for next period</label>
-            <textarea
+            <Label>Goals for next period</Label>
+            <Textarea
               value={form.goals}
               onChange={(e) => setForm((f) => ({ ...f, goals: e.target.value }))}
               rows={2}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Other comments (optional)</label>
-            <textarea
+            <Label>Other comments (optional)</Label>
+            <Textarea
               value={form.comments}
               onChange={(e) => setForm((f) => ({ ...f, comments: e.target.value }))}
               rows={2}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>
 
-          {error && <p className="text-red-600 text-xs">{error}</p>}
+          {error && <Alert variant="error">{error}</Alert>}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-brand-500 hover:bg-brand-600 text-white rounded-lg py-2 font-medium disabled:opacity-60"
-          >
+          <Button type="submit" className="w-full" loading={loading}>
             {loading ? "Submitting..." : "Submit Appraisal"}
-          </button>
+          </Button>
         </form>
       </Modal>
     </>

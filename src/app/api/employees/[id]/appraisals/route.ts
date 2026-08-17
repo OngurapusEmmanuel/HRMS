@@ -48,43 +48,74 @@ const schema = z.object({
   areasForImprovement: z.string().optional(),
   goals: z.string().optional(),
   comments: z.string().optional(),
+  cycleId: z.string().optional(),
+  reviewType: z.enum(["SELF", "MANAGER"]).optional(),
 });
 
 // POST /api/employees/:id/appraisals — file a new periodic review.
-// ADMIN/HR can appraise anyone; MANAGER only employees in a department they
-// head (canActOnDepartment — same rule as leave approval); EMPLOYEE cannot
-// create appraisals at all, including for themselves.
+//
+// Authorization branches on `reviewType`:
+// - "SELF": the employee reviewing themselves — allowed when the acting
+//   session's employeeId matches the target employee, regardless of role.
+//   No canActOnDepartment check (there's no "department" to be gated on when
+//   you're reviewing yourself).
+// - "MANAGER" or unset (legacy ad-hoc appraisals predating cycles): today's
+//   existing rule — ADMIN/HR can appraise anyone; MANAGER only employees in
+//   a department they head (canActOnDepartment); EMPLOYEE cannot create.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
 
   const role = (session.user as any).role;
-  const reviewerEmployeeId = (session.user as any).employeeId;
-  if (!can(role, "appraisal:create")) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
+  const actorEmployeeId = (session.user as any).employeeId;
   const organizationId = (session.user as any).organizationId;
+
   const employee = await prisma.employee.findFirst({
     where: { id: params.id, organizationId },
     select: { id: true, departmentId: true, firstName: true, lastName: true, user: { select: { id: true } } },
   });
   if (!employee) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const allowed = await canActOnDepartment(role, reviewerEmployeeId, employee.departmentId);
-  if (!allowed) {
-    return NextResponse.json(
-      { error: "You can only appraise employees in your own department" },
-      { status: 403 }
-    );
-  }
-  if (!reviewerEmployeeId) {
-    return NextResponse.json({ error: "Your account has no linked employee profile to appraise as" }, { status: 400 });
-  }
-
   const parsed = schema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  const { periodStart, periodEnd, scores, strengths, areasForImprovement, goals, comments } = parsed.data;
+  const { periodStart, periodEnd, scores, strengths, areasForImprovement, goals, comments, cycleId, reviewType } =
+    parsed.data;
+
+  const isSelfReview = reviewType === "SELF";
+  let reviewerEmployeeId: string;
+
+  if (isSelfReview) {
+    if (actorEmployeeId !== params.id) {
+      return NextResponse.json({ error: "You can only submit a self-review for yourself" }, { status: 403 });
+    }
+    reviewerEmployeeId = params.id;
+  } else {
+    if (!can(role, "appraisal:create")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const allowed = await canActOnDepartment(role, actorEmployeeId, employee.departmentId);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "You can only appraise employees in your own department" },
+        { status: 403 }
+      );
+    }
+    if (!actorEmployeeId) {
+      return NextResponse.json(
+        { error: "Your account has no linked employee profile to appraise as" },
+        { status: 400 }
+      );
+    }
+    reviewerEmployeeId = actorEmployeeId;
+  }
+
+  if (cycleId) {
+    const cycle = await prisma.appraisalCycle.findFirst({ where: { id: cycleId, organizationId } });
+    if (!cycle) return NextResponse.json({ error: "Cycle not found" }, { status: 400 });
+    if (cycle.status === "CLOSED") {
+      return NextResponse.json({ error: "This appraisal cycle is closed" }, { status: 400 });
+    }
+  }
 
   const unknownCriteria = Object.keys(scores).filter((k) => !(APPRAISAL_CRITERIA as readonly string[]).includes(k));
   if (unknownCriteria.length > 0) {
@@ -109,6 +140,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       areasForImprovement,
       goals,
       comments,
+      cycleId: cycleId || null,
+      reviewType: reviewType || null,
     },
   });
 
@@ -119,7 +152,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     action: "appraisal.create",
     targetType: "Appraisal",
     targetId: appraisal.id,
-    metadata: { employeeId: params.id, overallRating },
+    metadata: { employeeId: params.id, overallRating, cycleId: cycleId ?? null, reviewType: reviewType ?? null },
   });
 
   notify({

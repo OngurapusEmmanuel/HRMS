@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
 import Modal from "./Modal";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Alert } from "@/components/ui/alert";
 
 export default function AddDepartmentButton() {
   const router = useRouter();
@@ -33,31 +38,19 @@ export default function AddDepartmentButton() {
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="bg-brand-500 hover:bg-brand-600 text-white text-sm rounded-lg px-4 py-2"
-      >
-        + Add Department
-      </button>
+      <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setOpen(true)}>
+        Add Department
+      </Button>
       <Modal open={open} onClose={() => setOpen(false)} title="Add Department">
-        <form onSubmit={handleSubmit} className="space-y-3 text-sm">
+        <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-gray-700 mb-1">Name</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              className="w-full rounded-lg border border-gray-300 px-3 py-2"
-            />
+            <Label>Name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
-          {error && <p className="text-red-600 text-xs">{error}</p>}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-brand-500 hover:bg-brand-600 text-white rounded-lg py-2 font-medium disabled:opacity-60"
-          >
+          {error && <Alert variant="error">{error}</Alert>}
+          <Button type="submit" className="w-full" loading={loading}>
             {loading ? "Creating..." : "Create Department"}
-          </button>
+          </Button>
         </form>
       </Modal>
     </>

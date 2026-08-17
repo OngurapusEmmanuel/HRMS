@@ -9,7 +9,7 @@ built to scale from one company to a multi-tenant SaaS with minimal rework.
 
 - **Next.js 14 (App Router)** — UI + API routes in one deployable unit (Vercel-friendly)
 - **TypeScript** end to end
-- **PostgreSQL + Prisma** — typed schema, migrations, relational integrity (30 models)
+- **PostgreSQL + Prisma** — typed schema, migrations, relational integrity (34 models)
 - **NextAuth (Credentials + JWT)** — swap in SSO/OAuth later without touching business logic
 - **Tailwind CSS** — utility-first styling
 - **Recharts** — workforce trend charts on the Reports page
@@ -65,20 +65,23 @@ Fully wired end-to-end (form → API → DB → re-render). Grouped by module:
 - **Auth** — credentials login, JWT session, edge middleware protecting all `(dashboard)` routes, password reset (`/forgot-password` → emailed single-use token, 1hr expiry → `/reset-password`, doesn't reveal whether an email is registered, rate-limited)
 - **Employees** — searchable, paginated list, create (modal form), detail view, edit, soft-delete on termination, CSV export, org chart (`/org-chart`, renders the full reporting tree from `reportsToId`, collapsible)
 - **Departments** — list, create
-- **Leave** — self-service request form; approve/reject with atomic balance decrement, email notification, and audit log entry
+- **Leave** — self-service request form; approve/reject with atomic balance decrement, email notification, and audit log entry. Requesters can also cancel/withdraw their own pending or approved request (reversing the balance decrement if it was already approved), and a team calendar view (`/leaves` → Calendar tab) shows everyone's approved leave for the month.
 - **Attendance** — self check-in/check-out, late detection, daily roster view
 - **Payroll** — generate payslips using a progressive tax-bracket engine (editable per-org in Settings), idempotent generation, payslip history, CSV export
-- **Documents** — upload/list/delete files against an employee record; pluggable storage (`STORAGE_PROVIDER=local` or `s3` — AWS S3, Cloudflare R2, or GCS's S3-compatible API)
+- **Documents** — upload/list/delete files against an employee record, tagged with a type (Contract/Policy/Identity/Certificate/Other) and an optional expiry date (flagged in the UI once it's within 30 days or past); pluggable storage (`STORAGE_PROVIDER=local` or `s3` — AWS S3, Cloudflare R2, or GCS's S3-compatible API)
 - **Onboarding** — every new hire gets a checklist copied from the org's editable onboarding template at creation time
+- **Offboarding** — mirrors onboarding: terminating an employee (`DELETE /api/employees/:id`, exposed via a "Terminate" action on ADMIN accounts) copies the org's editable offboarding template onto that employee's own checklist, shown on their profile once terminated
+- **Profile completeness** — computed at read time (phone, department, manager, ≥1 document, onboarding fully complete, ≥1 appraisal on file) and shown as a percentage with what's missing, on the employee's own profile
 - **Notifications** — in-app bell (polls every 30s) plus emails for events that warrant them; pluggable email provider (`EMAIL_PROVIDER=console`, `resend`, or `ses`)
-- **Settings** (`/settings`, HR/Admin) — leave entitlements, payroll tax brackets, onboarding template, integration status with test-send
+- **Settings** (`/settings`, HR/Admin) — leave entitlements, payroll tax brackets, onboarding template, offboarding template, integration status with test-send
 - **Audit log** (`/audit-log`, HR/Admin) — append-only trail of sensitive actions across every module below
 
 ### Performance Management
 
 - **Appraisals** — managers file periodic reviews (`/appraisals` to browse, or from an employee's profile) scored across five criteria, department-scoped. Appraisals are immutable once filed.
+- **Appraisal cycles** (`/appraisals` → Cycles tab, HR/Admin create) — a named review cycle (e.g. "H2 2026 Growth Review") with a due date and an org-wide or department-scoped population; tags manager reviews and, when `requireSelfReview` is on, prompts each employee to file their own self-review from their profile. A per-cycle dashboard (`/appraisals/cycles/[id]`) shows submitted vs. not-started for both review types with completion-percentage progress bars. Cycles are a thin grouping layer over the existing `Appraisal` model — no separate draft/template engine, so ad-hoc appraisals filed outside a cycle keep working exactly as before.
 - **Contract summaries** — when an employee's contract ends (termination, or manually for a fixed-term contract nearing its `contractEndDate`), `lib/appraisal.ts` rolls up every appraisal on file into a `ContractSummary`: average rating, trend (Improving/Declining/Stable), condensed strengths/improvement themes, and a recommendation (Renew/Promote/Extend Probation/Do Not Renew).
-- **KPIs** — managers set trackable goals (target/current/unit/period) on an employee's profile; the employee self-reports progress, the manager sets status (On Track/At Risk/Off Track/Completed) and gets notified when their own KPI is flagged at risk.
+- **Goals** (`/goals`, kanban board across an employee's/manager's/org's scope) — trackable goals (target/current/unit/period) that can optionally cascade from a parent goal (org → team → individual), with a check-in history (note + optional evidence link) instead of silently overwriting progress. Status includes Not Started/On Track/At Risk/Off Track/Completed/Cancelled. Still the same `Kpi` model as before, extended rather than replaced.
 - **Review meetings** — managers schedule appraisal conversations against an employee, distinct from the written Appraisal itself; status tracked (Scheduled/Completed/Cancelled).
 - **360° feedback** — a manager opens a feedback round naming providers (self/manager/peer/direct-report); each provider submits independently at `/feedback` ("my tasks"); peer and direct-report responses are anonymized for anyone without org-wide appraisal visibility.
 
@@ -134,7 +137,7 @@ npm run test        # run once
 npm run test:watch  # watch mode
 ```
 
-Unit tests: `lib/rbac.ts` (permission checks and department-scoping, Prisma mocked), `lib/payroll.ts` (progressive tax bracket math), `lib/appraisal.ts` (rating averages, recommendation thresholds, trend detection), `lib/analytics.ts` (headcount/turnover reconstruction, department bucketing), and `lib/rate-limit.ts`.
+Unit tests: `lib/rbac.ts` (permission checks and department-scoping, Prisma mocked), `lib/payroll.ts` (progressive tax bracket math), `lib/appraisal.ts` (rating averages, recommendation thresholds, trend detection), `lib/analytics.ts` (headcount/turnover reconstruction, department bucketing), `lib/employees.ts` (profile-completeness scoring), and `lib/rate-limit.ts`.
 
 `.github/workflows/ci.yml` runs on every PR/push to `main`: install → generate → validate schema → sync a throwaway Postgres service container → lint → test → build. It uses `prisma db push` against the CI database until the project has a real committed migration history, at which point it automatically switches to `prisma migrate deploy` — the stronger check, since it verifies migrations actually reproduce the schema.
 
@@ -145,6 +148,7 @@ Unit tests: `lib/rbac.ts` (permission checks and department-scoping, Prisma mock
 - **`GET /api/health`** — unauthenticated, checks the DB connection with `SELECT 1`. Wired into the Dockerfile's `HEALTHCHECK` and is what a load balancer or uptime monitor should poll.
 - **Rate limiting** — `/api/auth/forgot-password` is limited to 5 requests per 15 minutes per IP+email pair via `lib/rate-limit.ts`, an in-memory limiter explicitly documented as single-instance-only — swap for Upstash Redis or similar before running multiple instances/serverless.
 - **Lazy status reconciliation** — training enrollments and compliance records don't need a cron job to flip to OVERDUE; each list endpoint reconciles stale rows against "now" before returning (`lib/learning.ts`, `lib/compliance.ts`). Simple and correct at MVP scale; if the org grows enough that "every read does a bulk UPDATE" becomes a cost concern, move this to a scheduled job instead.
+- **Leave reminders cron** (`GET /api/cron/leave-reminders`, `vercel.json`) — the one genuinely scheduled job in this app, deliberately an exception to "lazy reconciliation over cron jobs" below: a push notification for "your leave starts in 3 days" can't be produced by reconciling on read, since nothing guarantees anyone loads a page that day. Protected by a `CRON_SECRET` bearer token (the route 401s on any request without a match, including when the env var is unset — never trust-by-default). Runs daily at 07:00 UTC on Vercel; local/Docker self-hosted deployments would need their own scheduler (system cron, `node-cron`) hitting the same route, since Vercel Cron doesn't apply there. Low-balance notifications only fire for `LeaveBalance` rows where `entitled` has actually been set to a real value — see the low-balance-threshold caveat in "Known MVP limitations" below.
 
 ## Known MVP limitations / next steps
 
@@ -155,6 +159,17 @@ Unit tests: `lib/rbac.ts` (permission checks and department-scoping, Prisma mock
 - The onboarding checklist, appraisal criteria, and compliance requirements are all org-editable, but the *appraisal criteria* (`APPRAISAL_CRITERIA` in `lib/appraisal.ts`) are still a fixed constant, unlike the other two — move to a per-org template the same way if that's needed.
 - Job postings and the recruitment pipeline aren't department-scoped for managers the way everything else is (any Manager can view/manage any posting) — a deliberate simplification since hiring visibility is usually broader than day-to-day HR data, but worth revisiting if that's not true for your org.
 - Reports & Analytics recomputes from every employee row on each page load rather than caching — fine for an MVP-scale tenant; add caching or a materialized summary table if the employee count grows large enough for this to matter.
+- `LeaveBalance.entitled` is never actually populated from `LeavePolicy.annualDays` anywhere in the codebase — a balance row is created lazily on first approval with `entitled: 0`, and only `used` is ever updated after that. The low-balance reminder cron deliberately skips any row where `entitled <= 0` to avoid flagging every employee who's ever taken leave as "low balance" — but the right fix is a real annual-entitlement-population step (e.g. on year rollover, or backfilled from `LeavePolicy` when a balance is first created) that this repo doesn't have yet.
+
+### Planned: Trust & compliance
+
+Deliberately out of scope for this pass — a distinct, security-sensitive effort rather than something to bundle into a feature-completeness pass:
+
+- **Multi-factor authentication** for admin/HR accounts, optionally org-wide enforced.
+- **SSO readiness** — an OAuth/SAML/SCIM integration point (today's auth is credentials-only via NextAuth; the provider is swappable without touching business logic, but no second provider is wired in yet).
+- **Self-service data export/deletion** (GDPR-style access, correction, portability, and deletion/anonymization requests) — today an ADMIN can view/edit any record, but there's no structured request-and-fulfill workflow for a data-subject request.
+- **Configurable data retention** per category (audit logs, terminated-employee records, documents) — everything is currently retained indefinitely.
+- **Per-document visibility enforcement** — documents now carry a `type` and `expiresAt`, but `EmployeeDocument.fileUrl` is still a plain public static path with no auth on the file itself (see `lib/storage.ts`); a real visibility restriction needs an authenticated download-proxy route, not just a database flag with nothing enforcing it.
 
 ## Why this architecture
 

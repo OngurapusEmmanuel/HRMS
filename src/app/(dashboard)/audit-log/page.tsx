@@ -1,8 +1,12 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
+import { ScrollText } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
+import { PageHeader } from "@/components/ui/page-header";
+import { TableContainer, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { EmptyState } from "@/components/ui/empty-state";
 
 function describe(action: string) {
   const labels: Record<string, string> = {
@@ -30,43 +34,44 @@ export default async function AuditLogPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-gray-900 mb-1">Audit Log</h1>
-      <p className="text-sm text-gray-500 mb-6">Last 100 sensitive actions across the organization.</p>
+      <PageHeader
+        title="Audit Log"
+        description="Last 100 sensitive actions across the organization."
+      />
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-gray-500 text-left">
-            <tr>
-              <th className="px-4 py-3 font-medium">When</th>
-              <th className="px-4 py-3 font-medium">Actor</th>
-              <th className="px-4 py-3 font-medium">Action</th>
-              <th className="px-4 py-3 font-medium">Target</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
+      <TableContainer>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>When</TableHead>
+              <TableHead>Actor</TableHead>
+              <TableHead>Action</TableHead>
+              <TableHead>Target</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {logs.map((log) => (
-              <tr key={log.id}>
-                <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+              <TableRow key={log.id}>
+                <TableCell className="whitespace-nowrap text-secondary">
                   {log.createdAt.toLocaleString()}
-                </td>
-                <td className="px-4 py-3">{log.actorEmail}</td>
-                <td className="px-4 py-3">{describe(log.action)}</td>
-                <td className="px-4 py-3 text-gray-500">
+                </TableCell>
+                <TableCell>{log.actorEmail}</TableCell>
+                <TableCell>{describe(log.action)}</TableCell>
+                <TableCell className="text-secondary">
                   {log.targetType}
                   {log.targetId ? ` · ${log.targetId.slice(0, 8)}…` : ""}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-            {logs.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
-                  No activity recorded yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+        {logs.length === 0 && (
+          <EmptyState
+            icon={<ScrollText className="h-8 w-8" />}
+            title="No activity recorded yet"
+          />
+        )}
+      </TableContainer>
     </div>
   );
 }

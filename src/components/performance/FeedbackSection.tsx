@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
 import Modal from "../Modal";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Alert } from "@/components/ui/alert";
+import { feedbackSubmittedVariant } from "@/lib/badge-variants";
 
 type FeedbackReq = {
   id: string;
@@ -57,66 +64,72 @@ export default function FeedbackSection({
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="font-semibold text-gray-900">360° Feedback</h2>
+    <Card>
+      <CardHeader>
+        <CardTitle>360° Feedback</CardTitle>
         {canRequest && (
-          <button onClick={() => setOpen(true)} className="text-brand-600 hover:underline text-xs font-medium">
+          <Button variant="ghost" size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setOpen(true)}>
             Request Round
-          </button>
+          </Button>
         )}
-      </div>
+      </CardHeader>
 
-      <div className="space-y-3">
-        {requests.map((r) => (
-          <div key={r.id} className="text-sm border-b border-gray-100 pb-2">
-            <div className="flex items-center justify-between mb-1">
-              <span className="font-medium text-gray-900">
-                {r.provider ? `${r.provider.firstName} ${r.provider.lastName}` : "Anonymous"} · {r.relationship.replace("_", " ")}
-              </span>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.submitted ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                {r.submitted ? "Submitted" : "Pending"}
-              </span>
-            </div>
-            {r.submitted && (
-              <div className="text-xs text-gray-600 space-y-0.5">
-                {r.strengths && <p><span className="font-medium">Strengths: </span>{r.strengths}</p>}
-                {r.areasForImprovement && <p><span className="font-medium">Improvement: </span>{r.areasForImprovement}</p>}
-                {r.comments && <p><span className="font-medium">Comments: </span>{r.comments}</p>}
+      <CardContent>
+        <div className="space-y-3">
+          {requests.map((r) => (
+            <div key={r.id} className="border-b border-border pb-2 text-sm last:border-b-0 last:pb-0">
+              <div className="mb-1 flex items-center justify-between">
+                <span className="font-medium text-foreground">
+                  {r.provider ? `${r.provider.firstName} ${r.provider.lastName}` : "Anonymous"} · {r.relationship.replace("_", " ")}
+                </span>
+                <Badge variant={feedbackSubmittedVariant(r.submitted)}>{r.submitted ? "Submitted" : "Pending"}</Badge>
               </div>
-            )}
-          </div>
-        ))}
-        {requests.length === 0 && <p className="text-gray-400 text-sm">No feedback requested yet.</p>}
-      </div>
+              {r.submitted && (
+                <div className="space-y-0.5 text-xs text-secondary">
+                  {r.strengths && <p><span className="font-medium text-foreground">Strengths: </span>{r.strengths}</p>}
+                  {r.areasForImprovement && <p><span className="font-medium text-foreground">Improvement: </span>{r.areasForImprovement}</p>}
+                  {r.comments && <p><span className="font-medium text-foreground">Comments: </span>{r.comments}</p>}
+                </div>
+              )}
+            </div>
+          ))}
+          {requests.length === 0 && <p className="text-sm text-muted">No feedback requested yet.</p>}
+        </div>
+      </CardContent>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Request 360° Feedback">
-        <form onSubmit={submitRound} className="space-y-3 text-sm">
+        <form onSubmit={submitRound} className="space-y-3">
           {rows.map((row, i) => (
             <div key={i} className="flex gap-2">
-              <select value={row.providerId} onChange={(e) => updateRow(i, "providerId", e.target.value)} className="flex-1 rounded-lg border border-gray-300 px-3 py-2">
+              <Select value={row.providerId} onChange={(e) => updateRow(i, "providerId", e.target.value)} className="flex-1">
                 <option value="">Select person...</option>
                 {colleagues.map((c) => (
-                  <option key={c.id} value={c.id}>{c.firstName} {c.lastName}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.firstName} {c.lastName}
+                  </option>
                 ))}
-              </select>
-              <select value={row.relationship} onChange={(e) => updateRow(i, "relationship", e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2">
+              </Select>
+              <Select value={row.relationship} onChange={(e) => updateRow(i, "relationship", e.target.value)} className="w-40">
                 <option value="SELF">Self</option>
                 <option value="MANAGER">Manager</option>
                 <option value="PEER">Peer</option>
                 <option value="DIRECT_REPORT">Direct report</option>
-              </select>
+              </Select>
             </div>
           ))}
-          <button type="button" onClick={() => setRows((prev) => [...prev, { providerId: "", relationship: "PEER" }])} className="text-brand-600 hover:underline text-xs">
+          <Button
+            type="button"
+            variant="link"
+            onClick={() => setRows((prev) => [...prev, { providerId: "", relationship: "PEER" }])}
+          >
             + Add another
-          </button>
-          {error && <p className="text-red-600 text-xs">{error}</p>}
-          <button type="submit" disabled={loading} className="w-full bg-brand-500 hover:bg-brand-600 text-white rounded-lg py-2 font-medium disabled:opacity-60">
+          </Button>
+          {error && <Alert variant="error">{error}</Alert>}
+          <Button type="submit" className="w-full" loading={loading}>
             {loading ? "Sending..." : "Send Requests"}
-          </button>
+          </Button>
         </form>
       </Modal>
-    </div>
+    </Card>
   );
 }

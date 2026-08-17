@@ -5,7 +5,13 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
 import Modal from "./Modal";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Alert } from "@/components/ui/alert";
 
 const schema = z.object({
   email: z.string().email(),
@@ -50,78 +56,73 @@ export default function AddEmployeeButton({ departments }: { departments: { id: 
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="bg-brand-500 hover:bg-brand-600 text-white text-sm rounded-lg px-4 py-2"
-      >
-        + Add Employee
-      </button>
+      <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setOpen(true)}>
+        Add Employee
+      </Button>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Add Employee">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 text-sm">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-gray-700 mb-1">First name</label>
-              <input {...register("firstName")} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
-              {errors.firstName && <p className="text-red-600 text-xs mt-1">{errors.firstName.message}</p>}
+              <Label>First name</Label>
+              <Input {...register("firstName")} error={!!errors.firstName} />
+              {errors.firstName && <p className="mt-1 text-xs text-danger-500">{errors.firstName.message}</p>}
             </div>
             <div>
-              <label className="block text-gray-700 mb-1">Last name</label>
-              <input {...register("lastName")} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
-              {errors.lastName && <p className="text-red-600 text-xs mt-1">{errors.lastName.message}</p>}
+              <Label>Last name</Label>
+              <Input {...register("lastName")} error={!!errors.lastName} />
+              {errors.lastName && <p className="mt-1 text-xs text-danger-500">{errors.lastName.message}</p>}
             </div>
           </div>
 
           <div>
-            <label className="block text-gray-700 mb-1">Email</label>
-            <input type="email" {...register("email")} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
-            {errors.email && <p className="text-red-600 text-xs mt-1">{errors.email.message}</p>}
+            <Label>Email</Label>
+            <Input type="email" {...register("email")} error={!!errors.email} />
+            {errors.email && <p className="mt-1 text-xs text-danger-500">{errors.email.message}</p>}
           </div>
 
           <div>
-            <label className="block text-gray-700 mb-1">Temporary password</label>
-            <input type="password" {...register("password")} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
-            {errors.password && <p className="text-red-600 text-xs mt-1">{errors.password.message}</p>}
+            <Label>Temporary password</Label>
+            <Input type="password" {...register("password")} error={!!errors.password} />
+            {errors.password && <p className="mt-1 text-xs text-danger-500">{errors.password.message}</p>}
           </div>
 
           <div>
-            <label className="block text-gray-700 mb-1">Job title</label>
-            <input {...register("jobTitle")} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
-            {errors.jobTitle && <p className="text-red-600 text-xs mt-1">{errors.jobTitle.message}</p>}
+            <Label>Job title</Label>
+            <Input {...register("jobTitle")} error={!!errors.jobTitle} />
+            {errors.jobTitle && <p className="mt-1 text-xs text-danger-500">{errors.jobTitle.message}</p>}
           </div>
 
           <div>
-            <label className="block text-gray-700 mb-1">Department</label>
-            <select {...register("departmentId")} className="w-full rounded-lg border border-gray-300 px-3 py-2">
+            <Label>Department</Label>
+            <Select {...register("departmentId")}>
               <option value="">Unassigned</option>
               {departments.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-gray-700 mb-1">Hire date</label>
-              <input type="date" {...register("hireDate")} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
-              {errors.hireDate && <p className="text-red-600 text-xs mt-1">{errors.hireDate.message}</p>}
+              <Label>Hire date</Label>
+              <Input type="date" {...register("hireDate")} error={!!errors.hireDate} />
+              {errors.hireDate && <p className="mt-1 text-xs text-danger-500">{errors.hireDate.message}</p>}
             </div>
             <div>
-              <label className="block text-gray-700 mb-1">Annual salary</label>
-              <input type="number" step="0.01" {...register("baseSalary")} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
-              {errors.baseSalary && <p className="text-red-600 text-xs mt-1">{errors.baseSalary.message}</p>}
+              <Label>Annual salary</Label>
+              <Input type="number" step="0.01" {...register("baseSalary")} error={!!errors.baseSalary} />
+              {errors.baseSalary && <p className="mt-1 text-xs text-danger-500">{errors.baseSalary.message}</p>}
             </div>
           </div>
 
-          {serverError && <p className="text-red-600 text-xs">{serverError}</p>}
+          {serverError && <Alert variant="error">{serverError}</Alert>}
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-brand-500 hover:bg-brand-600 text-white rounded-lg py-2 font-medium disabled:opacity-60"
-          >
+          <Button type="submit" className="w-full" loading={isSubmitting}>
             {isSubmitting ? "Creating..." : "Create Employee"}
-          </button>
+          </Button>
         </form>
       </Modal>
     </>

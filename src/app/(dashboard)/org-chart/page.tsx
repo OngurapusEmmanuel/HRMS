@@ -1,7 +1,11 @@
+import { Network } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import OrgChartNode, { OrgNode } from "@/components/OrgChartNode";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export default async function OrgChartPage() {
   const session = await getServerSession(authOptions);
@@ -45,15 +49,15 @@ export default async function OrgChartPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-gray-900 mb-1">Org Chart</h1>
-      <p className="text-sm text-gray-500 mb-6">
-        Based on each employee's reporting line. Click − to collapse a branch.
-      </p>
+      <PageHeader title="Org Chart" description="Based on each employee's reporting line. Click − to collapse a branch." />
 
-      {roots.length === 0 && <p className="text-gray-400 text-sm">No employees to display.</p>}
-      {roots.map((root) => (
-        <OrgChartNode key={root.id} node={root} />
-      ))}
+      {roots.length === 0 ? (
+        <Card>
+          <EmptyState icon={<Network className="h-8 w-8" />} title="No employees to display" />
+        </Card>
+      ) : (
+        roots.map((root) => <OrgChartNode key={root.id} node={root} />)
+      )}
     </div>
   );
 }

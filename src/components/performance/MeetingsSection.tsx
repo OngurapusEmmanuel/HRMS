@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { meetingStatusVariant } from "@/lib/badge-variants";
 
 type Meeting = { id: string; scheduledAt: string; status: string; notes: string | null; organizer: { firstName: string; lastName: string } };
-
-const STATUS_STYLES: Record<string, string> = {
-  SCHEDULED: "bg-blue-100 text-blue-700",
-  COMPLETED: "bg-green-100 text-green-700",
-  CANCELLED: "bg-gray-100 text-gray-500",
-};
 
 export default function MeetingsSection({
   employeeId,
@@ -52,39 +52,49 @@ export default function MeetingsSection({
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
-      <h2 className="font-semibold text-gray-900 mb-3">Review Meetings</h2>
-      <div className="space-y-2 mb-4">
-        {meetings.map((m) => (
-          <div key={m.id} className="flex items-center justify-between text-sm border-b border-gray-100 pb-2">
-            <div>
-              <p className="font-medium text-gray-900">{new Date(m.scheduledAt).toLocaleString()}</p>
-              <p className="text-xs text-gray-400">with {m.organizer.firstName} {m.organizer.lastName}</p>
-            </div>
-            {canManage && m.status === "SCHEDULED" ? (
-              <div className="flex gap-1">
-                <button onClick={() => setStatus(m.id, "COMPLETED")} className="text-green-600 hover:underline text-xs">Complete</button>
-                <button onClick={() => setStatus(m.id, "CANCELLED")} className="text-red-600 hover:underline text-xs">Cancel</button>
+    <Card>
+      <CardHeader>
+        <CardTitle>Review Meetings</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-4 space-y-2">
+          {meetings.map((m) => (
+            <div key={m.id} className="flex items-center justify-between border-b border-border pb-2 text-sm last:border-b-0 last:pb-0">
+              <div>
+                <p className="font-medium text-foreground">{new Date(m.scheduledAt).toLocaleString()}</p>
+                <p className="text-xs text-muted">
+                  with {m.organizer.firstName} {m.organizer.lastName}
+                </p>
               </div>
-            ) : (
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[m.status]}`}>{m.status}</span>
-            )}
-          </div>
-        ))}
-        {meetings.length === 0 && <p className="text-gray-400 text-sm">No meetings scheduled.</p>}
-      </div>
+              {canManage && m.status === "SCHEDULED" ? (
+                <div className="flex gap-3">
+                  <button onClick={() => setStatus(m.id, "COMPLETED")} className="text-xs text-success-700 hover:underline">
+                    Complete
+                  </button>
+                  <button onClick={() => setStatus(m.id, "CANCELLED")} className="text-xs text-danger-500 hover:underline">
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <Badge variant={meetingStatusVariant[m.status] ?? "neutral"}>{m.status}</Badge>
+              )}
+            </div>
+          ))}
+          {meetings.length === 0 && <p className="text-sm text-muted">No meetings scheduled.</p>}
+        </div>
 
-      {canManage && (
-        <form onSubmit={schedule} className="flex items-end gap-2 text-sm border-t border-gray-100 pt-4">
-          <div className="flex-1">
-            <label className="block text-gray-700 mb-1">Schedule a review meeting</label>
-            <input type="datetime-local" required value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
-          </div>
-          <button type="submit" disabled={loading} className="bg-brand-500 hover:bg-brand-600 text-white rounded-lg px-4 py-2 font-medium disabled:opacity-60">
-            Schedule
-          </button>
-        </form>
-      )}
-    </div>
+        {canManage && (
+          <form onSubmit={schedule} className="flex items-end gap-2 border-t border-border pt-4">
+            <div className="flex-1">
+              <Label>Schedule a review meeting</Label>
+              <Input type="datetime-local" required value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
+            </div>
+            <Button type="submit" loading={loading}>
+              Schedule
+            </Button>
+          </form>
+        )}
+      </CardContent>
+    </Card>
   );
 }

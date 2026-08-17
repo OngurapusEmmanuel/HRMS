@@ -34,6 +34,7 @@ const schema = z.object({
   unit: z.string().optional(),
   periodStart: z.string(),
   periodEnd: z.string(),
+  parentGoalId: z.string().nullable().optional(),
 });
 
 // POST /api/employees/:id/kpis — set a new KPI. Same department-scoping as
@@ -55,6 +56,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const parsed = schema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
+  if (parsed.data.parentGoalId) {
+    const parentGoal = await prisma.kpi.findFirst({
+      where: { id: parsed.data.parentGoalId, organizationId },
+      select: { id: true },
+    });
+    if (!parentGoal) return NextResponse.json({ error: "Parent goal not found" }, { status: 400 });
+  }
+
   const kpi = await prisma.kpi.create({
     data: {
       employeeId: params.id,
@@ -65,6 +74,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       unit: parsed.data.unit,
       periodStart: new Date(parsed.data.periodStart),
       periodEnd: new Date(parsed.data.periodEnd),
+      parentGoalId: parsed.data.parentGoalId || null,
       createdById: actorEmployeeId ?? "",
     },
   });

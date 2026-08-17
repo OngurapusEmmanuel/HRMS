@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { DEFAULT_ONBOARDING_TASKS } from "../src/lib/onboarding";
+import { DEFAULT_OFFBOARDING_TASKS } from "../src/lib/offboarding";
 import { computeOverallRating, generateContractSummary } from "../src/lib/appraisal";
 
 const prisma = new PrismaClient();
@@ -209,6 +210,20 @@ async function main() {
   });
   await generateContractSummary(priya.id, org.id, adminUser.id);
 
+  // Offboarding checklist, partially worked through — demonstrates the
+  // termination -> checklist pipeline the same way Priya already
+  // demonstrates termination -> contract summary.
+  await prisma.offboardingTask.createMany({
+    data: DEFAULT_OFFBOARDING_TASKS.map((t, i) => ({
+      employeeId: priya.id,
+      title: t.title,
+      description: t.description,
+      order: i,
+      completed: i < 2,
+      completedAt: i < 2 ? new Date() : null,
+    })),
+  });
+
   // ---------- Workforce trend history (for Reports & Analytics) ----------
   // A few more employees hired/terminated at different points over the past
   // year so the headcount and turnover charts show real movement instead of
@@ -374,31 +389,49 @@ async function main() {
   });
 
   // ---------- Performance: KPIs, meetings, 360 feedback ----------
-  await prisma.kpi.createMany({
+  const sprintVelocityGoal = await prisma.kpi.create({
+    data: {
+      employeeId: jane.id,
+      organizationId: org.id,
+      title: "Sprint velocity",
+      target: 40,
+      current: 34,
+      unit: " pts",
+      periodStart: monthsAgo(1),
+      periodEnd: daysFromNow(10),
+      status: "ON_TRACK",
+      createdById: manager.id,
+    },
+  });
+  await prisma.kpi.create({
+    data: {
+      employeeId: jane.id,
+      organizationId: org.id,
+      title: "Code review turnaround",
+      target: 24,
+      current: 40,
+      unit: "h",
+      periodStart: monthsAgo(1),
+      periodEnd: daysFromNow(10),
+      status: "AT_RISK",
+      createdById: manager.id,
+    },
+  });
+  // Check-in history on the sprint velocity goal, so the kanban card shows
+  // real progress evidence instead of a bare number.
+  await prisma.kpiCheckIn.createMany({
     data: [
       {
-        employeeId: jane.id,
-        organizationId: org.id,
-        title: "Sprint velocity",
-        target: 40,
-        current: 34,
-        unit: " pts",
-        periodStart: monthsAgo(1),
-        periodEnd: daysFromNow(10),
-        status: "ON_TRACK",
-        createdById: manager.id,
+        kpiId: sprintVelocityGoal.id,
+        note: "Sprint 1 done — 18 pts, slower start due to onboarding overlap.",
+        createdById: jane.id,
+        createdAt: monthsAgo(0, 20),
       },
       {
-        employeeId: jane.id,
-        organizationId: org.id,
-        title: "Code review turnaround",
-        target: 24,
-        current: 40,
-        unit: "h",
-        periodStart: monthsAgo(1),
-        periodEnd: daysFromNow(10),
-        status: "AT_RISK",
-        createdById: manager.id,
+        kpiId: sprintVelocityGoal.id,
+        note: "Sprint 2 done — 34 pts cumulative, back on pace.",
+        createdById: jane.id,
+        createdAt: monthsAgo(0, 5),
       },
     ],
   });
@@ -430,6 +463,82 @@ async function main() {
       strengths: "Consistently reliable, great ownership of the dashboard feature.",
       areasForImprovement: "Could delegate smaller tasks instead of doing everything herself.",
     },
+  });
+
+  // ---------- Appraisal cycle ----------
+  // Jane has submitted both her self-review and her manager's review; Taylor
+  // has submitted neither — gives the cycle dashboard a real not-started vs.
+  // submitted split to show instead of an all-or-nothing demo.
+  const growthCycle = await prisma.appraisalCycle.create({
+    data: {
+      organizationId: org.id,
+      name: "H2 2026 Growth Review",
+      periodStart: monthsAgo(6),
+      periodEnd: new Date(),
+      dueAt: daysFromNow(14),
+      requireSelfReview: true,
+      status: "ACTIVE",
+      createdById: adminUser.id,
+    },
+  });
+  const janeCycleScores = { "Communication": 4, "Technical Skills": 4, "Teamwork": 5, "Punctuality": 4, "Initiative": 4 };
+  await prisma.appraisal.create({
+    data: {
+      employeeId: jane.id,
+      reviewerId: manager.id,
+      organizationId: org.id,
+      cycleId: growthCycle.id,
+      reviewType: "MANAGER",
+      periodStart: growthCycle.periodStart,
+      periodEnd: growthCycle.periodEnd,
+      scores: janeCycleScores,
+      overallRating: computeOverallRating(janeCycleScores),
+      strengths: "Owns the dashboard feature end-to-end, great cross-team communication this half.",
+      areasForImprovement: "Could write more design docs before diving into implementation.",
+      goals: "Lead the Q1 platform migration.",
+    },
+  });
+  const janeSelfScores = { "Communication": 4, "Technical Skills": 3, "Teamwork": 4, "Punctuality": 4, "Initiative": 5 };
+  await prisma.appraisal.create({
+    data: {
+      employeeId: jane.id,
+      reviewerId: jane.id,
+      organizationId: org.id,
+      cycleId: growthCycle.id,
+      reviewType: "SELF",
+      periodStart: growthCycle.periodStart,
+      periodEnd: growthCycle.periodEnd,
+      scores: janeSelfScores,
+      overallRating: computeOverallRating(janeSelfScores),
+      strengths: "Took initiative on the reporting dashboard without being asked.",
+      areasForImprovement: "Still building confidence with the payments codebase.",
+      goals: "Get more comfortable pairing on unfamiliar parts of the stack.",
+    },
+  });
+
+  // ---------- Documents ----------
+  await prisma.employeeDocument.createMany({
+    data: [
+      {
+        employeeId: jane.id,
+        title: "Signed employment contract",
+        type: "CONTRACT",
+        fileUrl: "/uploads/seed-jane-contract.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 182_000,
+        uploadedById: hrUser.id,
+      },
+      {
+        employeeId: jane.id,
+        title: "Work permit",
+        type: "IDENTITY",
+        fileUrl: "/uploads/seed-jane-permit.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 94_000,
+        expiresAt: daysFromNow(18), // expiring soon — exercises the warning chip
+        uploadedById: hrUser.id,
+      },
+    ],
   });
 
   // ---------- Learning & Development ----------

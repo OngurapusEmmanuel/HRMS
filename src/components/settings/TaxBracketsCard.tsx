@@ -1,6 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/alert";
 
 type Bracket = { upTo: string | null; rate: string }; // decimals arrive serialized as strings from Prisma
 
@@ -52,63 +56,74 @@ export default function TaxBracketsCard({ initialBrackets }: { initialBrackets: 
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
-      <h2 className="font-semibold text-gray-900 mb-1">Payroll Tax Brackets</h2>
-      <p className="text-sm text-gray-500 mb-4">
-        Progressive annual income brackets used when generating payroll. The last row is always uncapped.
-      </p>
-
-      <div className="space-y-2 mb-4">
-        <div className="grid grid-cols-[1fr_1fr_auto] gap-2 text-xs text-gray-400 px-1">
-          <span>Up to (annual)</span>
-          <span>Rate (%)</span>
-          <span />
+    <Card>
+      <CardHeader className="flex-col items-start gap-0">
+        <CardTitle>Payroll Tax Brackets</CardTitle>
+        <CardDescription>
+          Progressive annual income brackets used when generating payroll. The last row is always uncapped.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-4 space-y-2">
+          <div className="grid grid-cols-[1fr_1fr_auto] gap-2 px-1 text-xs text-muted">
+            <span>Up to (annual)</span>
+            <span>Rate (%)</span>
+            <span />
+          </div>
+          {rows.map((row, i) => {
+            const isLast = i === rows.length - 1;
+            return (
+              <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-center gap-2 text-sm">
+                <Input
+                  type="number"
+                  placeholder={isLast ? "Uncapped" : "e.g. 24000"}
+                  disabled={isLast}
+                  value={row.upTo}
+                  onChange={(e) => updateRow(i, "upTo", e.target.value)}
+                />
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={row.ratePercent}
+                  onChange={(e) => updateRow(i, "ratePercent", e.target.value)}
+                />
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={() => removeRow(i)}
+                  disabled={rows.length <= 1}
+                  className="text-xs text-danger-500 hover:text-danger-700"
+                >
+                  Remove
+                </Button>
+              </div>
+            );
+          })}
         </div>
-        {rows.map((row, i) => {
-          const isLast = i === rows.length - 1;
-          return (
-            <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center text-sm">
-              <input
-                type="number"
-                placeholder={isLast ? "Uncapped" : "e.g. 24000"}
-                disabled={isLast}
-                value={row.upTo}
-                onChange={(e) => updateRow(i, "upTo", e.target.value)}
-                className="rounded-lg border border-gray-300 px-3 py-1.5 disabled:bg-gray-50 disabled:text-gray-400"
-              />
-              <input
-                type="number"
-                step="0.1"
-                value={row.ratePercent}
-                onChange={(e) => updateRow(i, "ratePercent", e.target.value)}
-                className="rounded-lg border border-gray-300 px-3 py-1.5"
-              />
-              <button
-                onClick={() => removeRow(i)}
-                disabled={rows.length <= 1}
-                className="text-red-500 hover:underline text-xs disabled:opacity-30 disabled:pointer-events-none"
-              >
-                Remove
-              </button>
-            </div>
-          );
-        })}
-      </div>
 
-      <div className="flex items-center gap-3">
-        <button onClick={addRow} className="text-sm text-brand-600 hover:underline">
-          + Add bracket
-        </button>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="ml-auto bg-brand-500 hover:bg-brand-600 text-white rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60"
-        >
-          {saving ? "Saving..." : "Save Brackets"}
-        </button>
-      </div>
-      {error && <p className="text-red-600 text-xs mt-2">{error}</p>}
-      {saved && !error && <p className="text-green-600 text-xs mt-2">Saved. Future payroll runs will use this schedule.</p>}
-    </div>
+        <div className="flex items-center gap-3">
+          <Button variant="link" size="sm" onClick={addRow} className="text-sm">
+            + Add bracket
+          </Button>
+          <Button onClick={handleSave} disabled={saving} loading={saving} className="ml-auto" size="sm">
+            {saving ? "Saving..." : "Save Brackets"}
+          </Button>
+        </div>
+      </CardContent>
+      {(error || saved) && (
+        <CardFooter className="pt-0">
+          {error && (
+            <Alert variant="error" className="w-full">
+              {error}
+            </Alert>
+          )}
+          {saved && !error && (
+            <Alert variant="success" className="w-full">
+              Saved. Future payroll runs will use this schedule.
+            </Alert>
+          )}
+        </CardFooter>
+      )}
+    </Card>
   );
 }

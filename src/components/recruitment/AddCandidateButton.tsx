@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
 import Modal from "../Modal";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Alert } from "@/components/ui/alert";
 
 export default function AddCandidateButton({ jobPostingId }: { jobPostingId: string }) {
   const router = useRouter();
@@ -32,41 +37,45 @@ export default function AddCandidateButton({ jobPostingId }: { jobPostingId: str
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="bg-brand-500 hover:bg-brand-600 text-white text-sm rounded-lg px-4 py-2">
-        + Add Candidate
-      </button>
+      <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setOpen(true)}>
+        Add Candidate
+      </Button>
       <Modal open={open} onClose={() => setOpen(false)} title="Add Candidate to Pipeline">
-        <form onSubmit={handleSubmit} className="space-y-3 text-sm">
+        <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-gray-700 mb-1">First name</label>
-              <input required value={form.firstName} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
+              <Label>First name</Label>
+              <Input required value={form.firstName} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} />
             </div>
             <div>
-              <label className="block text-gray-700 mb-1">Last name</label>
-              <input required value={form.lastName} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
+              <Label>Last name</Label>
+              <Input required value={form.lastName} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} />
             </div>
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Email</label>
-            <input type="email" required value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
+            <Label>Email</Label>
+            <Input type="email" required value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Phone (optional)</label>
-            <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
+            <Label>Phone (optional)</Label>
+            <Input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Resume URL (optional)</label>
-            <input value={form.resumeUrl} onChange={(e) => setForm((f) => ({ ...f, resumeUrl: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
+            <Label>Resume URL (optional)</Label>
+            <Input value={form.resumeUrl} onChange={(e) => setForm((f) => ({ ...f, resumeUrl: e.target.value }))} />
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Source (optional)</label>
-            <input placeholder="Referral, LinkedIn, career site..." value={form.source} onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
+            <Label>Source (optional)</Label>
+            <Input
+              placeholder="Referral, LinkedIn, career site..."
+              value={form.source}
+              onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))}
+            />
           </div>
-          {error && <p className="text-red-600 text-xs">{error}</p>}
-          <button type="submit" disabled={loading} className="w-full bg-brand-500 hover:bg-brand-600 text-white rounded-lg py-2 font-medium disabled:opacity-60">
+          {error && <Alert variant="error">{error}</Alert>}
+          <Button type="submit" className="w-full" loading={loading}>
             {loading ? "Adding..." : "Add to Pipeline"}
-          </button>
+          </Button>
         </form>
       </Modal>
     </>

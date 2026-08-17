@@ -4,8 +4,91 @@
 
 :root {
   --sidebar-width: 240px;
+  --sidebar-width-collapsed: 72px;
+
+  --color-primary-50: 240 245 255;
+  --color-primary-100: 219 230 255;
+  --color-primary-200: 189 208 255;
+  --color-primary-300: 147 176 253;
+  --color-primary-400: 102 136 240;
+  --color-primary-500: 59 91 219; /* #3b5bdb */
+  --color-primary-600: 48 73 179;
+  --color-primary-700: 38 57 140;
+  --color-primary-800: 29 44 107;
+  --color-primary-900: 22 31 77;
+  --color-primary-950: 13 18 48;
+
+  --color-bg: 247 248 251;
+  --color-surface: 255 255 255;
+  --color-surface-2: 241 243 249;
+  --color-border: 226 229 238;
+  --color-border-strong: 203 208 224;
+  --color-text: 16 19 26;
+  --color-text-secondary: 75 81 101;
+  --color-text-muted: 136 145 168;
+
+  --color-success-100: 220 245 227;
+  --color-success-500: 22 163 74;
+  --color-success-700: 21 122 61;
+  --color-warning-100: 254 243 199;
+  --color-warning-500: 217 119 6;
+  --color-warning-700: 146 64 14;
+  --color-danger-100: 253 226 226;
+  --color-danger-500: 220 38 38;
+  --color-danger-700: 153 27 27;
+  --color-info-100: 224 242 254;
+  --color-info-500: 2 132 199;
+  --color-info-700: 7 89 133;
+}
+
+.dark {
+  --color-primary-50: 22 31 77;
+  --color-primary-100: 29 44 107;
+  --color-primary-200: 38 57 140;
+  --color-primary-300: 48 73 179;
+  --color-primary-400: 91 124 240;
+  --color-primary-500: 91 124 240; /* #5b7cf0, lifted for dark-surface contrast */
+  --color-primary-600: 123 152 245;
+  --color-primary-700: 189 208 255;
+  --color-primary-800: 219 230 255;
+  --color-primary-900: 240 245 255;
+  --color-primary-950: 255 255 255;
+
+  --color-bg: 11 13 18;
+  --color-surface: 18 21 29;
+  --color-surface-2: 26 30 41;
+  --color-border: 38 43 56;
+  --color-border-strong: 52 59 76;
+  --color-text: 243 244 248;
+  --color-text-secondary: 180 186 203;
+  --color-text-muted: 124 131 153;
+
+  --color-success-100: 17 51 33;
+  --color-success-500: 34 197 94;
+  --color-success-700: 134 239 172;
+  --color-warning-100: 58 42 13;
+  --color-warning-500: 245 158 11;
+  --color-warning-700: 252 211 77;
+  --color-danger-100: 59 19 21;
+  --color-danger-500: 248 113 113;
+  --color-danger-700: 252 165 165;
+  --color-info-100: 12 42 58;
+  --color-info-500: 56 189 248;
+  --color-info-700: 125 211 252;
 }
 
 body {
-  @apply bg-gray-50 text-gray-900;
+  @apply bg-background text-foreground antialiased;
+}
+
+* {
+  @apply border-border;
+}
+
+::selection {
+  @apply bg-primary-200 text-primary-900;
+}
+
+.dark ::selection {
+  @apply bg-primary-800 text-primary-50;
 }

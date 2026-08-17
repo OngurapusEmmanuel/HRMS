@@ -2,19 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AlertCircle } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { trainingStatusVariant } from "@/lib/badge-variants";
 
 type Enrollment = {
   id: string;
   status: string;
   dueDate: string | null;
   course: { title: string; category: string };
-};
-
-const STATUS_STYLES: Record<string, string> = {
-  NOT_STARTED: "bg-gray-100 text-gray-600",
-  IN_PROGRESS: "bg-blue-100 text-blue-700",
-  COMPLETED: "bg-green-100 text-green-700",
-  OVERDUE: "bg-red-100 text-red-700",
 };
 
 export default function TrainingSection({ enrollments: initial, canUpdate }: { enrollments: Enrollment[]; canUpdate: boolean }) {
@@ -36,33 +34,39 @@ export default function TrainingSection({ enrollments: initial, canUpdate }: { e
   if (enrollments.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
-      <h2 className="font-semibold text-gray-900 mb-3">Training</h2>
-      <div className="divide-y divide-gray-100">
-        {enrollments.map((e) => (
-          <div key={e.id} className="py-2 flex items-center justify-between text-sm">
-            <div>
-              <p className="font-medium text-gray-900">{e.course.title}</p>
-              {e.dueDate && <p className="text-xs text-gray-400">Due {new Date(e.dueDate).toLocaleDateString()}</p>}
-            </div>
-            {canUpdate && e.status !== "COMPLETED" ? (
-              <div className="flex gap-1">
-                {["IN_PROGRESS", "COMPLETED"].map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setStatus(e.id, s)}
-                    className="px-2 py-0.5 rounded-full text-xs bg-gray-50 text-gray-500 hover:bg-gray-100"
-                  >
-                    Mark {s.replace("_", " ").toLowerCase()}
-                  </button>
-                ))}
+    <Card>
+      <CardHeader>
+        <CardTitle>Training</CardTitle>
+      </CardHeader>
+      <CardContent className="divide-y divide-border">
+        {enrollments.map((e) => {
+          const isOverdue = e.status === "OVERDUE";
+          return (
+            <div key={e.id} className="py-2 flex items-center justify-between text-sm">
+              <div>
+                <p className="font-medium text-foreground">{e.course.title}</p>
+                {e.dueDate && (
+                  <p className={`flex items-center gap-1 text-xs ${isOverdue ? "text-danger-600 dark:text-danger-500" : "text-muted"}`}>
+                    {isOverdue && <AlertCircle className="h-3.5 w-3.5" />}
+                    Due {new Date(e.dueDate).toLocaleDateString()}
+                  </p>
+                )}
               </div>
-            ) : (
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[e.status]}`}>{e.status.replace("_", " ")}</span>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
+              {canUpdate && e.status !== "COMPLETED" ? (
+                <div className="flex gap-1">
+                  {["IN_PROGRESS", "COMPLETED"].map((s) => (
+                    <Button key={s} variant="outline" size="sm" onClick={() => setStatus(e.id, s)}>
+                      Mark {s.replace("_", " ").toLowerCase()}
+                    </Button>
+                  ))}
+                </div>
+              ) : (
+                <Badge variant={trainingStatusVariant[e.status] ?? "neutral"}>{e.status.replace("_", " ")}</Badge>
+              )}
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
   );
 }

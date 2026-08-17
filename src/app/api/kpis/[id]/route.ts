@@ -8,7 +8,7 @@ import { notify } from "@/lib/notifications";
 
 const schema = z.object({
   current: z.number().optional(),
-  status: z.enum(["ON_TRACK", "AT_RISK", "OFF_TRACK", "COMPLETED"]).optional(),
+  status: z.enum(["NOT_STARTED", "ON_TRACK", "AT_RISK", "OFF_TRACK", "COMPLETED", "CANCELLED"]).optional(),
 });
 
 // PATCH /api/kpis/:id — update progress. The employee the KPI belongs to

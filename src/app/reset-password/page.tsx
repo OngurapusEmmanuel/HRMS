@@ -3,6 +3,11 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import AuthCard from "@/components/AuthCard";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/alert";
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -42,63 +47,58 @@ function ResetPasswordForm() {
     setTimeout(() => router.push("/login"), 2000);
   }
 
-  if (done) return <p className="text-sm text-green-600">Password updated. Redirecting to sign in…</p>;
+  if (done) return <Alert variant="success">Password updated. Redirecting to sign in…</Alert>;
 
   if (!token) {
     return (
-      <p className="text-sm text-red-600">
+      <Alert variant="error">
         This link is missing its token. Request a new one from the{" "}
-        <Link href="/forgot-password" className="underline">forgot password</Link> page.
-      </p>
+        <Link href="/forgot-password" className="underline">
+          forgot password
+        </Link>{" "}
+        page.
+      </Alert>
     );
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">New password</label>
-        <input
+        <Label htmlFor="password">New password</Label>
+        <Input
+          id="password"
           type="password"
           required
           minLength={8}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Confirm password</label>
-        <input
+        <Label htmlFor="confirm">Confirm password</Label>
+        <Input
+          id="confirm"
           type="password"
           required
           minLength={8}
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
         />
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full bg-brand-500 hover:bg-brand-600 text-white rounded-lg py-2 text-sm font-medium transition disabled:opacity-60"
-      >
+      {error && <Alert variant="error">{error}</Alert>}
+      <Button type="submit" className="w-full" loading={loading}>
         {loading ? "Saving..." : "Reset password"}
-      </button>
+      </Button>
     </form>
   );
 }
 
 export default function ResetPasswordPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-sm bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-        <h1 className="text-xl font-semibold text-gray-900 mb-1">Set a new password</h1>
-        <p className="text-sm text-gray-500 mb-6">Choose something you haven't used before.</p>
-        <Suspense fallback={<p className="text-sm text-gray-400">Loading…</p>}>
-          <ResetPasswordForm />
-        </Suspense>
-      </div>
-    </div>
+    <AuthCard title="Set a new password" description="Choose something you haven't used before.">
+      <Suspense fallback={<p className="text-sm text-muted">Loading…</p>}>
+        <ResetPasswordForm />
+      </Suspense>
+    </AuthCard>
   );
 }
