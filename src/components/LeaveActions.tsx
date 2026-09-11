@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 export default function LeaveActions({ leaveId }: { leaveId: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState<"APPROVED" | "REJECTED" | null>(null);
+  const [confirmReject, setConfirmReject] = useState(false);
 
   async function review(status: "APPROVED" | "REJECTED") {
     setLoading(status);
@@ -17,7 +19,10 @@ export default function LeaveActions({ leaveId }: { leaveId: string }) {
       body: JSON.stringify({ status }),
     });
     setLoading(null);
-    if (res.ok) router.refresh();
+    if (res.ok) {
+      setConfirmReject(false);
+      router.refresh();
+    }
   }
 
   return (
@@ -36,12 +41,21 @@ export default function LeaveActions({ leaveId }: { leaveId: string }) {
         variant="destructive"
         size="sm"
         leftIcon={<X className="h-3.5 w-3.5" />}
-        loading={loading === "REJECTED"}
         disabled={loading !== null}
-        onClick={() => review("REJECTED")}
+        onClick={() => setConfirmReject(true)}
       >
-        {loading === "REJECTED" ? "Rejecting..." : "Reject"}
+        Reject
       </Button>
+      <ConfirmDialog
+        open={confirmReject}
+        onOpenChange={setConfirmReject}
+        title="Reject this leave request?"
+        description="The requester will be notified and this decision can't be undone."
+        confirmLabel="Reject"
+        variant="danger"
+        loading={loading === "REJECTED"}
+        onConfirm={() => review("REJECTED")}
+      />
     </div>
   );
 }

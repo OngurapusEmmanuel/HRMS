@@ -3,16 +3,13 @@ import { z } from "zod";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { canActOnDepartment } from "@/lib/rbac";
+import { canActOnEmployee } from "@/lib/rbac";
 import { logAudit } from "@/lib/audit";
 
 const schema = z.object({ completed: z.boolean() });
 
 async function canManageOffboarding(session: any, targetEmployee: { id: string; departmentId: string | null }) {
-  const role = session.user.role;
-  if (role === "ADMIN" || role === "HR") return true;
-  if (session.user.employeeId === targetEmployee.id) return true;
-  return canActOnDepartment(role, session.user.employeeId, targetEmployee.departmentId);
+  return canActOnEmployee(session.user.role, session.user.employeeId, targetEmployee.id, targetEmployee.departmentId);
 }
 
 // PATCH /api/employees/:id/offboarding/:taskId — toggle a checklist item.

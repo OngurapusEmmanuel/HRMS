@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
+import { extractErrorMessage } from "@/lib/api-error";
 
 type Item = { title: string; description: string | null };
 
@@ -57,7 +58,7 @@ export default function OnboardingTemplateCard({ initialItems }: { initialItems:
     setSaving(false);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "Failed to save");
+      setError(extractErrorMessage(body, "Failed to save"));
       return;
     }
     setItems(cleaned);
@@ -76,7 +77,7 @@ export default function OnboardingTemplateCard({ initialItems }: { initialItems:
       <CardContent>
         <div className="mb-4 space-y-3">
           {items.map((item, i) => (
-            <div key={i} className="flex items-start gap-2">
+            <div key={i} className="-mx-2 flex items-start gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-surface-2">
               <div className="flex flex-col gap-0.5 pt-1.5">
                 <button
                   type="button"

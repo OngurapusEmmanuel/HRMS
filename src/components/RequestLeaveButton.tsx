@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
+import { extractErrorMessage } from "@/lib/api-error";
 
 const LEAVE_TYPES = ["ANNUAL", "SICK", "UNPAID", "MATERNITY", "PATERNITY", "OTHER"];
 
@@ -22,8 +23,12 @@ export default function RequestLeaveButton() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setError(null);
+    if (form.endDate && form.startDate && form.endDate < form.startDate) {
+      setError("End date can't be before the start date.");
+      return;
+    }
+    setLoading(true);
     const res = await fetch("/api/leaves", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -32,7 +37,7 @@ export default function RequestLeaveButton() {
     setLoading(false);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error?.formErrors?.[0] ?? body.error ?? "Failed to submit request");
+      setError(extractErrorMessage(body, "Failed to submit request"));
       return;
     }
     setForm({ type: "ANNUAL", startDate: "", endDate: "", reason: "" });
@@ -73,6 +78,7 @@ export default function RequestLeaveButton() {
               <Input
                 type="date"
                 required
+                min={form.startDate || undefined}
                 value={form.endDate}
                 onChange={(e) => setForm({ ...form, endDate: e.target.value })}
               />

@@ -2,6 +2,10 @@ import { AuthOptions, getServerSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "./db";
+import { rateLimit } from "./rate-limit";
+
+const LOGIN_RATE_LIMIT = 8; // attempts
+const LOGIN_RATE_WINDOW_MS = 15 * 60 * 1000; // per 15 minutes, per IP+email pair
 
 export const authOptions: AuthOptions = {
   session: { strategy: "jwt" },
@@ -13,8 +17,17 @@ export const authOptions: AuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      // NextAuth's CredentialsProvider passes a stripped-down request object
+      // (headers as a plain record, not a Headers instance) as the second
+      // argument — not the `clientIp(req: Request)` helper's shape, so IP
+      // extraction is inlined here rather than reusing that helper as-is.
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) return null;
+
+        const forwardedFor = req?.headers?.["x-forwarded-for"];
+        const ip = (Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor)?.split(",")[0]?.trim() ?? "unknown";
+        const { allowed } = rateLimit(`login:${ip}:${credentials.email.toLowerCase()}`, LOGIN_RATE_LIMIT, LOGIN_RATE_WINDOW_MS);
+        if (!allowed) return null; // same "Invalid email or password" the UI already shows — doesn't leak that a limit exists
 
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },

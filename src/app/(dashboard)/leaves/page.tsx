@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CalendarDays } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -8,27 +9,44 @@ import LeaveActions from "@/components/LeaveActions";
 import CancelLeaveButton from "@/components/CancelLeaveButton";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { leaveStatusVariant } from "@/lib/badge-variants";
 import { TableContainer, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import TeamCalendar from "@/components/leave/TeamCalendar";
 
-export default async function LeavesPage() {
+const PAGE_SIZE = 20;
+
+export default async function LeavesPage({
+  searchParams,
+}: {
+  searchParams: { page?: string };
+}) {
   const session = await getServerSession(authOptions);
   const role = (session!.user as any).role;
   const organizationId = (session!.user as any).organizationId;
   const employeeId = (session!.user as any).employeeId;
 
-  const requests = await prisma.leaveRequest.findMany({
-    where: {
-      employee: { organizationId },
-      ...(role === "EMPLOYEE" ? { employeeId } : {}),
-    },
-    include: { employee: { select: { firstName: true, lastName: true, employeeCode: true } } },
-    orderBy: { createdAt: "desc" },
-    take: 50,
-  });
+  const page = Math.max(1, Number(searchParams.page ?? "1") || 1);
+
+  const where = {
+    employee: { organizationId },
+    ...(role === "EMPLOYEE" ? { employeeId } : {}),
+  };
+
+  const [requests, total] = await Promise.all([
+    prisma.leaveRequest.findMany({
+      where,
+      include: { employee: { select: { firstName: true, lastName: true, employeeCode: true } } },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    prisma.leaveRequest.count({ where }),
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const canApprove = can(role, "leave:approve");
 
@@ -85,7 +103,7 @@ export default async function LeavesPage() {
                       {showActionColumn && (
                         <TableCell>
                           {canCancelOwn ? (
-                            <CancelLeaveButton leaveId={r.id} />
+                            <CancelLeaveButton leaveId={r.id} status={r.status as "PENDING" | "APPROVED"} />
                           ) : (
                             canReviewRow && <LeaveActions leaveId={r.id} />
                           )}
@@ -104,6 +122,28 @@ export default async function LeavesPage() {
               />
             )}
           </TableContainer>
+
+          {totalPages > 1 && (
+            <div className="mt-4 flex items-center justify-between text-sm text-secondary">
+              <span>
+                Page {page} of {totalPages} · {total} request{total === 1 ? "" : "s"}
+              </span>
+              <div className="flex gap-2">
+                <Link
+                  href={`/leaves?page=${Math.max(1, page - 1)}`}
+                  className={buttonVariants({ variant: "outline", size: "sm", className: page <= 1 ? "pointer-events-none opacity-40" : "" })}
+                >
+                  Previous
+                </Link>
+                <Link
+                  href={`/leaves?page=${Math.min(totalPages, page + 1)}`}
+                  className={buttonVariants({ variant: "outline", size: "sm", className: page >= totalPages ? "pointer-events-none opacity-40" : "" })}
+                >
+                  Next
+                </Link>
+              </div>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="calendar">

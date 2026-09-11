@@ -6,23 +6,37 @@ import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import { logAudit } from "@/lib/audit";
 
-// GET /api/appraisal-cycles — list every cycle in the org, newest first.
-// Deliberately read-only for any authenticated role (not gated behind
+// GET /api/appraisal-cycles?page=&pageSize= — list cycles in the org, newest
+// first. Deliberately read-only for any authenticated role (not gated behind
 // appraisal:cycle_manage): MANAGER/EMPLOYEE need this to find the active
 // cycle for self-review prompts elsewhere, even though only HR/Admin can
 // create or close cycles. The Cycles tab UI itself is only linked for
-// roles that pass appraisal:cycle_manage.
-export async function GET() {
+// roles that pass appraisal:cycle_manage — that tab fetches straight from
+// Prisma server-side rather than this route, but every list endpoint here
+// paginates and scopes to the caller's organization on principle.
+export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
 
+  const { searchParams } = new URL(req.url);
+  const page = Number(searchParams.get("page") ?? "1");
+  const pageSize = Math.min(Number(searchParams.get("pageSize") ?? "20"), 100);
+
   const organizationId = (session.user as any).organizationId;
-  const cycles = await prisma.appraisalCycle.findMany({
-    where: { organizationId },
-    include: { department: { select: { id: true, name: true } } },
-    orderBy: { createdAt: "desc" },
-  });
-  return NextResponse.json(cycles);
+  const where = { organizationId };
+
+  const [items, total] = await Promise.all([
+    prisma.appraisalCycle.findMany({
+      where,
+      include: { department: { select: { id: true, name: true } } },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.appraisalCycle.count({ where }),
+  ]);
+
+  return NextResponse.json({ items, total, page, pageSize });
 }
 
 const schema = z.object({

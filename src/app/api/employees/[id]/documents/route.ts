@@ -3,16 +3,19 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { saveFile } from "@/lib/storage";
+import { canActOnEmployee } from "@/lib/rbac";
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 
 // A user may manage documents on an employee record if they're HR/Admin,
 // or if the record IS their own employee profile (self-service uploads:
-// ID copies, signed offer letters, etc).
+// ID copies, signed offer letters, etc) — deliberately NOT extended to
+// department managers, unlike most other employee-scoped resources; these
+// are more sensitive records.
 async function canManageDocuments(session: any, targetEmployeeId: string) {
-  const role = session.user.role;
-  if (role === "ADMIN" || role === "HR") return true;
-  return session.user.employeeId === targetEmployeeId;
+  return canActOnEmployee(session.user.role, session.user.employeeId, targetEmployeeId, null, {
+    includeDepartmentManager: false,
+  });
 }
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {

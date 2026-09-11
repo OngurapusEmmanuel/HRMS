@@ -16,6 +16,7 @@ import {
   subMonths,
 } from "date-fns";
 import { cn } from "@/lib/cn";
+import { Alert } from "@/components/ui/alert";
 
 type LeaveDay = {
   id: string;
@@ -37,12 +38,17 @@ export default function TeamCalendar() {
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [leaves, setLeaves] = useState<LeaveDay[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setError(null);
     fetch(`/api/leaves/calendar?month=${format(month, "yyyy-MM")}`)
-      .then((res) => (res.ok ? res.json() : []))
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load the team calendar. Please try again.");
+        return res.json();
+      })
       .then((data: any[]) => {
         if (cancelled) return;
         const mapped: LeaveDay[] = data.map((r) => ({
@@ -53,6 +59,11 @@ export default function TeamCalendar() {
           type: r.type,
         }));
         setLeaves(mapped);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLeaves(null);
+        setError("Failed to load the team calendar. Please try again.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -93,39 +104,46 @@ export default function TeamCalendar() {
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-border bg-border text-xs">
-        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-          <div key={d} className="bg-surface-2 px-2 py-1.5 text-center font-medium text-muted">
-            {d}
-          </div>
-        ))}
-        {days.map((day) => {
-          const dayLeaves = leavesOn(day);
-          return (
-            <div
-              key={day.toISOString()}
-              className={cn(
-                "min-h-[72px] bg-surface p-1.5",
-                !isSameMonth(day, month) && "opacity-40",
-                isSameDay(day, new Date()) && "ring-1 ring-inset ring-primary-500"
-              )}
-            >
-              <span className="text-[11px] text-muted">{format(day, "d")}</span>
-              <div className="mt-1 space-y-0.5">
-                {dayLeaves.slice(0, 3).map((l) => (
-                  <div key={l.id} className="flex items-center gap-1 truncate text-[10px] text-secondary" title={`${l.employeeName} · ${l.type}`}>
-                    <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", colorFor(l.employeeName))} />
-                    <span className="truncate">{l.employeeName}</span>
-                  </div>
-                ))}
-                {dayLeaves.length > 3 && <p className="text-[10px] text-muted">+{dayLeaves.length - 3} more</p>}
-              </div>
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <div className="grid min-w-[560px] grid-cols-7 gap-px overflow-hidden bg-border text-xs">
+          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+            <div key={d} className="bg-surface-2 px-2 py-1.5 text-center font-medium text-muted">
+              {d}
             </div>
-          );
-        })}
+          ))}
+          {days.map((day) => {
+            const dayLeaves = leavesOn(day);
+            return (
+              <div
+                key={day.toISOString()}
+                className={cn(
+                  "min-h-[72px] bg-surface p-1.5 transition-colors",
+                  !isSameMonth(day, month) && "opacity-40",
+                  isSameDay(day, new Date()) && "ring-1 ring-inset ring-primary-500"
+                )}
+              >
+                <span className="text-[11px] text-muted">{format(day, "d")}</span>
+                <div className="mt-1 space-y-0.5">
+                  {dayLeaves.slice(0, 3).map((l) => (
+                    <div key={l.id} className="flex items-center gap-1 truncate text-[10px] text-secondary" title={`${l.employeeName} · ${l.type}`}>
+                      <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", colorFor(l.employeeName))} />
+                      <span className="truncate">{l.employeeName}</span>
+                    </div>
+                  ))}
+                  {dayLeaves.length > 3 && <p className="text-[10px] text-muted">+{dayLeaves.length - 3} more</p>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
+      {error && (
+        <div className="mt-2">
+          <Alert variant="error">{error}</Alert>
+        </div>
+      )}
       {loading && <p className="mt-2 text-xs text-muted">Loading…</p>}
-      {!loading && leaves && leaves.length === 0 && (
+      {!loading && !error && leaves && leaves.length === 0 && (
         <p className="mt-2 text-xs text-muted">No approved leave this month.</p>
       )}
     </div>

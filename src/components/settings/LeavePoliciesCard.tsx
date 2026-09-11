@@ -40,7 +40,7 @@ export default function LeavePoliciesCard({ initialPolicies }: { initialPolicies
       <CardContent>
         <div className="space-y-3">
           {ALL_TYPES.map((type) => (
-            <div key={type} className="flex items-center gap-3 text-sm">
+            <div key={type} className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-surface-2">
               <span className="w-28 text-foreground">{type}</span>
               <Input
                 type="number"

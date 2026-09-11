@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/alert";
 import { kpiStatusVariant } from "@/lib/badge-variants";
+import { extractErrorMessage } from "@/lib/api-error";
 
 type CheckIn = {
   id: string;
@@ -67,23 +68,29 @@ export default function KpiSection({
   const [checkIns, setCheckIns] = useState<Record<string, CheckIn[]>>({});
   const [checkInsExpanded, setCheckInsExpanded] = useState<Record<string, boolean>>({});
   const [checkInsLoading, setCheckInsLoading] = useState<Record<string, boolean>>({});
+  const [checkInsFetchError, setCheckInsFetchError] = useState<Record<string, string | null>>({});
   const [checkInCounts, setCheckInCounts] = useState<Record<string, number>>(() =>
     Object.fromEntries(initialKpis.map((k) => [k.id, k._count?.checkIns ?? 0]))
   );
 
   async function addKpi(e: React.FormEvent) {
     e.preventDefault();
+    const targetNum = Number(form.target);
+    if (!(targetNum > 0)) {
+      setError("Target must be greater than 0");
+      return;
+    }
     setLoading(true);
     setError(null);
     const res = await fetch(`/api/employees/${employeeId}/kpis`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, target: Number(form.target) }),
+      body: JSON.stringify({ ...form, target: targetNum }),
     });
     setLoading(false);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "Failed to add KPI");
+      setError(extractErrorMessage(body, "Failed to add KPI"));
       return;
     }
     const created = await res.json();
@@ -125,7 +132,7 @@ export default function KpiSection({
     setCheckInLoading((s) => ({ ...s, [kpiId]: false }));
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setCheckInError((s) => ({ ...s, [kpiId]: body.error ?? "Failed to add check-in" }));
+      setCheckInError((s) => ({ ...s, [kpiId]: extractErrorMessage(body, "Failed to add check-in") }));
       return;
     }
     const created = await res.json();
@@ -147,14 +154,25 @@ export default function KpiSection({
     }
     if (!checkIns[kpiId]) {
       setCheckInsLoading((prev) => ({ ...prev, [kpiId]: true }));
-      const res = await fetch(`/api/kpis/${kpiId}/check-ins`);
-      setCheckInsLoading((prev) => ({ ...prev, [kpiId]: false }));
-      if (res.ok) {
-        const data = await res.json();
-        setCheckIns((prev) => ({ ...prev, [kpiId]: data }));
-        setCheckInCounts((prev) => ({ ...prev, [kpiId]: data.length }));
+      setCheckInsFetchError((prev) => ({ ...prev, [kpiId]: null }));
+      try {
+        const res = await fetch(`/api/kpis/${kpiId}/check-ins`);
+        setCheckInsLoading((prev) => ({ ...prev, [kpiId]: false }));
+        if (res.ok) {
+          const data = await res.json();
+          setCheckIns((prev) => ({ ...prev, [kpiId]: data }));
+          setCheckInCounts((prev) => ({ ...prev, [kpiId]: data.length }));
+        } else {
+          const body = await res.json().catch(() => ({}));
+          setCheckInsFetchError((prev) => ({ ...prev, [kpiId]: extractErrorMessage(body, "Failed to load check-ins") }));
+        }
+      } catch {
+        setCheckInsLoading((prev) => ({ ...prev, [kpiId]: false }));
+        setCheckInsFetchError((prev) => ({ ...prev, [kpiId]: "Failed to load check-ins" }));
       }
     }
+    // Expand even on failure — the expanded panel is where the error renders,
+    // so "Loading…" doesn't just silently vanish with nothing to show for it.
     setCheckInsExpanded((prev) => ({ ...prev, [kpiId]: true }));
   }
 
@@ -182,7 +200,7 @@ export default function KpiSection({
                 </div>
                 {k.parent && <p className="mb-1 text-xs text-muted">part of: {k.parent.title}</p>}
                 <div className="mb-1 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
-                  <div className="h-full bg-primary-500" style={{ width: `${pct}%` }} />
+                  <div className="h-full bg-primary-500 transition-all duration-300" style={{ width: `${pct}%` }} />
                 </div>
                 <div className="flex items-center justify-between text-xs text-muted">
                   <span>
@@ -199,27 +217,38 @@ export default function KpiSection({
                   </button>
                 </div>
 
-                {checkInsExpanded[k.id] && (
-                  <div className="mt-2 space-y-2 rounded-lg bg-surface-2 p-2">
-                    {(checkIns[k.id] ?? []).length === 0 && <p className="text-xs text-muted">No check-ins yet.</p>}
-                    {(checkIns[k.id] ?? []).slice(0, 5).map((c) => (
-                      <div key={c.id} className="text-xs">
-                        <span className="text-muted">{new Date(c.createdAt).toLocaleDateString()}</span>
-                        <p className="text-secondary">{c.note}</p>
-                        {c.evidenceUrl && (
-                          <a
-                            href={c.evidenceUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-primary-600 hover:underline dark:text-primary-400"
-                          >
-                            evidence
-                          </a>
-                        )}
-                      </div>
-                    ))}
+                <div
+                  className={cn(
+                    "grid overflow-hidden transition-all duration-300 ease-out",
+                    checkInsExpanded[k.id] ? "mt-2 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                  )}
+                >
+                  <div className="min-h-0 space-y-2 overflow-hidden rounded-lg bg-surface-2 p-2">
+                    {checkInsFetchError[k.id] ? (
+                      <Alert variant="error">{checkInsFetchError[k.id]}</Alert>
+                    ) : (
+                      <>
+                        {(checkIns[k.id] ?? []).length === 0 && <p className="text-xs text-muted">No check-ins yet.</p>}
+                        {(checkIns[k.id] ?? []).slice(0, 5).map((c) => (
+                          <div key={c.id} className="text-xs">
+                            <span className="text-muted">{new Date(c.createdAt).toLocaleDateString()}</span>
+                            <p className="text-secondary">{c.note}</p>
+                            {c.evidenceUrl && (
+                              <a
+                                href={c.evidenceUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-primary-600 hover:underline dark:text-primary-400"
+                              >
+                                evidence
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                      </>
+                    )}
                   </div>
-                )}
+                </div>
 
                 {(isOwner || canManage) && (
                   <div className="mt-2">
@@ -296,7 +325,14 @@ export default function KpiSection({
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label>Target</Label>
-                <Input required type="number" step="0.01" value={form.target} onChange={(e) => setForm((f) => ({ ...f, target: e.target.value }))} />
+                <Input
+                  required
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={form.target}
+                  onChange={(e) => setForm((f) => ({ ...f, target: e.target.value }))}
+                />
               </div>
               <div>
                 <Label>Unit (%, $, tickets...)</Label>

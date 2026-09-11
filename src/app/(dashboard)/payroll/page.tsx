@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Download, Wallet } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -9,15 +10,23 @@ import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableContainer, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
+const PAGE_SIZE = 20;
+
 function money(n: unknown) {
   return `$${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-export default async function PayrollPage() {
+export default async function PayrollPage({
+  searchParams,
+}: {
+  searchParams: { page?: string };
+}) {
   const session = await getServerSession(authOptions);
   const organizationId = (session!.user as any).organizationId;
   const role = (session!.user as any).role;
   const employeeId = (session!.user as any).employeeId;
+
+  const page = Math.max(1, Number(searchParams.page ?? "1") || 1);
 
   let scopeFilter = {};
   if (role === "EMPLOYEE") {
@@ -27,15 +36,22 @@ export default async function PayrollPage() {
     scopeFilter = { employee: { departmentId: { in: deptIds } } };
   }
 
-  const payslips = await prisma.payslip.findMany({
-    where: {
-      employee: { organizationId },
-      ...scopeFilter,
-    },
-    include: { employee: { select: { firstName: true, lastName: true, employeeCode: true } } },
-    orderBy: [{ periodYear: "desc" }, { periodMonth: "desc" }],
-    take: 100,
-  });
+  const where = {
+    employee: { organizationId },
+    ...scopeFilter,
+  };
+
+  const [payslips, total] = await Promise.all([
+    prisma.payslip.findMany({
+      where,
+      include: { employee: { select: { firstName: true, lastName: true, employeeCode: true } } },
+      orderBy: [{ periodYear: "desc" }, { periodMonth: "desc" }],
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    prisma.payslip.count({ where }),
+  ]);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div>
@@ -88,6 +104,28 @@ export default async function PayrollPage() {
           />
         )}
       </TableContainer>
+
+      {totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between text-sm text-secondary">
+          <span>
+            Page {page} of {totalPages} · {total} payslip{total === 1 ? "" : "s"}
+          </span>
+          <div className="flex gap-2">
+            <Link
+              href={`/payroll?page=${Math.max(1, page - 1)}`}
+              className={buttonVariants({ variant: "outline", size: "sm", className: page <= 1 ? "pointer-events-none opacity-40" : "" })}
+            >
+              Previous
+            </Link>
+            <Link
+              href={`/payroll?page=${Math.min(totalPages, page + 1)}`}
+              className={buttonVariants({ variant: "outline", size: "sm", className: page >= totalPages ? "pointer-events-none opacity-40" : "" })}
+            >
+              Next
+            </Link>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

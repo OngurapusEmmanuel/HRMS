@@ -9,7 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { interviewOutcomeVariant } from "@/lib/badge-variants";
+import { extractErrorMessage } from "@/lib/api-error";
 
 type Interview = {
   id: string;
@@ -50,6 +52,8 @@ export default function ApplicationDetail({
   const [interviewForm, setInterviewForm] = useState({ interviewerId: employees[0]?.id ?? "", scheduledAt: "" });
   const [offerForm, setOfferForm] = useState({ proposedSalary: "", startDate: "" });
   const [hirePassword, setHirePassword] = useState("");
+  const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
+  const [pendingOfferStatus, setPendingOfferStatus] = useState<"DECLINED" | "EXPIRED" | null>(null);
 
   async function updateStage(newStage: string) {
     setLoading(true);
@@ -67,6 +71,19 @@ export default function ApplicationDetail({
     }
     setStage(newStage);
     router.refresh();
+  }
+
+  function requestStageChange(newStage: string) {
+    if (newStage === "REJECTED") {
+      setRejectConfirmOpen(true);
+      return;
+    }
+    updateStage(newStage);
+  }
+
+  async function confirmReject() {
+    await updateStage("REJECTED");
+    setRejectConfirmOpen(false);
   }
 
   async function scheduleInterview(e: React.FormEvent) {
@@ -137,6 +154,22 @@ export default function ApplicationDetail({
     }
   }
 
+  function requestOfferStatus(status: "ACCEPTED" | "DECLINED" | "EXPIRED") {
+    if (status === "DECLINED" || status === "EXPIRED") {
+      setPendingOfferStatus(status);
+      return;
+    }
+    updateOfferStatus(status);
+  }
+
+  async function confirmOfferStatus() {
+    if (!pendingOfferStatus) return;
+    setLoading(true);
+    await updateOfferStatus(pendingOfferStatus);
+    setLoading(false);
+    setPendingOfferStatus(null);
+  }
+
   async function hire(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -149,7 +182,7 @@ export default function ApplicationDetail({
     setLoading(false);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error?.formErrors?.[0] ?? body.error ?? "Failed to hire candidate");
+      setError(extractErrorMessage(body, "Failed to hire candidate"));
       return;
     }
     const employee = await res.json();
@@ -169,7 +202,7 @@ export default function ApplicationDetail({
                   size="sm"
                   variant={s === stage ? "primary" : "outline"}
                   disabled={loading || s === stage}
-                  onClick={() => updateStage(s)}
+                  onClick={() => requestStageChange(s)}
                   className="disabled:cursor-default"
                 >
                   {s}
@@ -264,13 +297,13 @@ export default function ApplicationDetail({
               </p>
               {canManage && offer.status === "PENDING" && (
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => updateOfferStatus("ACCEPTED")}>
+                  <Button size="sm" variant="outline" onClick={() => requestOfferStatus("ACCEPTED")}>
                     Mark Accepted
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => updateOfferStatus("DECLINED")}>
+                  <Button size="sm" variant="outline" onClick={() => requestOfferStatus("DECLINED")}>
                     Mark Declined
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => updateOfferStatus("EXPIRED")}>
+                  <Button size="sm" variant="outline" onClick={() => requestOfferStatus("EXPIRED")}>
                     Mark Expired
                   </Button>
                 </div>
@@ -327,6 +360,32 @@ export default function ApplicationDetail({
       </Card>
 
       {error && <Alert variant="error">{error}</Alert>}
+
+      <ConfirmDialog
+        open={rejectConfirmOpen}
+        onOpenChange={setRejectConfirmOpen}
+        title="Reject this candidate?"
+        description="This moves the application to the Rejected stage and notifies HR and admins in the pipeline. The candidate isn't notified automatically, so follow up with them directly if needed."
+        confirmLabel="Reject"
+        variant="danger"
+        loading={loading}
+        onConfirm={confirmReject}
+      />
+
+      <ConfirmDialog
+        open={pendingOfferStatus !== null}
+        onOpenChange={(open) => !open && setPendingOfferStatus(null)}
+        title={pendingOfferStatus === "EXPIRED" ? "Mark this offer as expired?" : "Mark this offer as declined?"}
+        description={
+          pendingOfferStatus === "EXPIRED"
+            ? "The offer status will be updated to Expired."
+            : "The offer status will be updated to Declined."
+        }
+        confirmLabel={pendingOfferStatus === "EXPIRED" ? "Mark Expired" : "Mark Declined"}
+        variant="danger"
+        loading={loading}
+        onConfirm={confirmOfferStatus}
+      />
     </div>
   );
 }

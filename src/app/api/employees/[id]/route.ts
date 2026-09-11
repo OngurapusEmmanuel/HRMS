@@ -116,9 +116,10 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     targetId: params.id,
   });
 
-  // Contract end is exactly the trigger this exists for. Best-effort: a
-  // failure here shouldn't block the termination itself — HR can always
-  // regenerate manually via POST /api/employees/:id/contract-summary.
+  // Contract summary and offboarding checklist are independent side effects
+  // of termination — each gets its own try/catch so one failing doesn't
+  // silently skip the other, and each surfaces to HR on failure rather than
+  // only a server-side console.error (which HR would never see).
   try {
     const summary = await generateContractSummary(params.id, organizationId, (session.user as any).id);
     logAudit({
@@ -138,7 +139,19 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
       body: summary.recommendation ? `Recommendation: ${summary.recommendation.replace(/_/g, " ")}` : undefined,
       link: `/employees/${params.id}`,
     });
+  } catch (err) {
+    console.error("Failed to auto-generate contract summary on termination:", err);
+    notifyRoles({
+      organizationId,
+      roles: ["ADMIN", "HR"],
+      type: "GENERAL",
+      title: `Contract summary failed for ${existing.firstName} ${existing.lastName}`,
+      body: "Generate it manually from their profile.",
+      link: `/employees/${params.id}`,
+    });
+  }
 
+  try {
     await assignOffboardingChecklist(params.id, organizationId);
     logAudit({
       organizationId,
@@ -150,7 +163,15 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
       metadata: { employeeId: params.id, trigger: "termination" },
     });
   } catch (err) {
-    console.error("Failed to auto-generate contract summary / assign offboarding checklist on termination:", err);
+    console.error("Failed to assign offboarding checklist on termination:", err);
+    notifyRoles({
+      organizationId,
+      roles: ["ADMIN", "HR"],
+      type: "GENERAL",
+      title: `Offboarding checklist wasn't created for ${existing.firstName} ${existing.lastName}`,
+      body: "Check Settings → Offboarding and their profile.",
+      link: `/employees/${params.id}`,
+    });
   }
 
   return NextResponse.json({ success: true });

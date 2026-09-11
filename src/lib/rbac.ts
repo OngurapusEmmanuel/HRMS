@@ -71,3 +71,23 @@ export async function canActOnKpi(
   if (actorEmployeeId === kpiEmployeeId) return true;
   return can(role, "kpi:manage") && (await canActOnDepartment(role, actorEmployeeId, kpiDepartmentId));
 }
+
+// True if `actorEmployeeId` (acting with `role`) may view/manage records
+// belonging to `targetEmployeeId` in `targetDepartmentId` — ADMIN/HR org-wide,
+// the employee themselves, or (unless explicitly excluded) the manager of
+// their department. Shared by the offboarding checklist routes, which both
+// want the department-manager path; documents deliberately opts out of it
+// (more sensitive records — HR/Admin or self only), so that's an explicit
+// option rather than a second near-identical function.
+export async function canActOnEmployee(
+  role: Role | string,
+  actorEmployeeId: string | null,
+  targetEmployeeId: string,
+  targetDepartmentId: string | null,
+  options: { includeDepartmentManager?: boolean } = {}
+): Promise<boolean> {
+  if (role === "ADMIN" || role === "HR") return true;
+  if (actorEmployeeId === targetEmployeeId) return true;
+  if (options.includeDepartmentManager === false) return false;
+  return canActOnDepartment(role, actorEmployeeId, targetDepartmentId);
+}

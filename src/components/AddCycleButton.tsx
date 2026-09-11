@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
+import { extractErrorMessage } from "@/lib/api-error";
 
 const schema = z.object({
   name: z.string().min(1, "Required"),
@@ -43,7 +44,7 @@ export default function AddCycleButton({ departments }: { departments: { id: str
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setServerError(body.error?.formErrors?.[0] ?? body.error ?? "Failed to create cycle");
+      setServerError(extractErrorMessage(body, "Failed to create cycle"));
       return;
     }
     reset();

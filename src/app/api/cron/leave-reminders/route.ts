@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { startOfDay, addDays } from "date-fns";
 import { prisma } from "@/lib/db";
-import { notify } from "@/lib/notifications";
+import { notifyMany } from "@/lib/notifications";
+import { env } from "@/lib/env";
 
 // GET /api/cron/leave-reminders — the one genuinely scheduled job in this
 // app. Everything else (training/compliance overdue status) is reconciled
@@ -11,9 +12,8 @@ import { notify } from "@/lib/notifications";
 // vercel.json; protected by a bearer secret since Vercel Cron just issues a
 // plain HTTP GET with no other auth of its own.
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
   const authHeader = req.headers.get("authorization");
-  if (!secret || authHeader !== `Bearer ${secret}`) {
+  if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -31,22 +31,21 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  let upcomingNotified = 0;
-  for (const leave of upcoming) {
-    await notify({
+  // Cross-tenant by design (one cron run covers every org) — each
+  // notification is still addressed using that row's own organizationId, so
+  // this isn't a scoping gap, just not org-filtered at the query level.
+  await notifyMany(
+    upcoming.map((leave) => ({
       userId: leave.employee.user.id,
       organizationId: leave.employee.organizationId,
-      type: "LEAVE_UPCOMING",
+      type: "LEAVE_UPCOMING" as const,
       title: "Your leave starts in 3 days",
       body: `${leave.type} · ${leave.startDate.toDateString()} – ${leave.endDate.toDateString()}`,
       link: "/leaves",
-    });
-    upcomingNotified++;
-  }
+    }))
+  );
 
-  const threshold = Number(process.env.LOW_BALANCE_THRESHOLD_DAYS ?? "2");
   const currentYear = new Date().getFullYear();
-
   const balances = await prisma.leaveBalance.findMany({
     where: { year: currentYear },
     include: {
@@ -54,26 +53,24 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  let lowBalanceNotified = 0;
-  for (const balance of balances) {
-    // `entitled` is only ever set to a real value when something other than
-    // the default upsert-on-first-approval path has populated it (today
-    // that defaults to 0, see POST /api/leaves/[id]) — skip rows where it's
-    // still 0 rather than flag every employee who's ever taken leave as
-    // "low balance".
-    if (balance.entitled <= 0) continue;
-    const remaining = balance.entitled - balance.used;
-    if (remaining > threshold) continue;
-    await notify({
-      userId: balance.employee.user.id,
-      organizationId: balance.employee.organizationId,
-      type: "LEAVE_LOW_BALANCE",
-      title: "Low leave balance",
-      body: `${remaining} day${remaining === 1 ? "" : "s"} of ${balance.type} leave remaining this year.`,
-      link: "/leaves",
+  // `entitled` is only ever set to a real value when something other than
+  // the default upsert-on-first-approval path has populated it (today that
+  // defaults to 0, see POST /api/leaves/[id]) — skip rows where it's still 0
+  // rather than flag every employee who's ever taken leave as "low balance".
+  const lowBalances = balances
+    .filter((b) => b.entitled > 0 && b.entitled - b.used <= env.LOW_BALANCE_THRESHOLD_DAYS)
+    .map((balance) => {
+      const remaining = balance.entitled - balance.used;
+      return {
+        userId: balance.employee.user.id,
+        organizationId: balance.employee.organizationId,
+        type: "LEAVE_LOW_BALANCE" as const,
+        title: "Low leave balance",
+        body: `${remaining} day${remaining === 1 ? "" : "s"} of ${balance.type} leave remaining this year.`,
+        link: "/leaves",
+      };
     });
-    lowBalanceNotified++;
-  }
+  await notifyMany(lowBalances);
 
-  return NextResponse.json({ upcomingNotified, lowBalanceNotified });
+  return NextResponse.json({ upcomingNotified: upcoming.length, lowBalanceNotified: lowBalances.length });
 }

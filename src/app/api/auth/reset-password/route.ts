@@ -3,16 +3,23 @@ import { z } from "zod";
 import { createHash } from "crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
 
 const schema = z.object({
   token: z.string().min(1),
   password: z.string().min(8),
 });
 
+const RATE_LIMIT = 10; // attempts
+const RATE_WINDOW_MS = 15 * 60 * 1000; // per 15 minutes, per IP
+
 // POST /api/auth/reset-password — consumes a token exactly once. The token
 // is looked up by its hash (never stored raw), and expiry/used-state are
 // checked before anything is written.
 export async function POST(req: NextRequest) {
+  const { allowed } = rateLimit(`reset-password:${clientIp(req)}`, RATE_LIMIT, RATE_WINDOW_MS);
+  if (!allowed) return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429 });
+
   const parsed = schema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 

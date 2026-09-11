@@ -24,7 +24,7 @@ export default function OrgChartNode({ node, depth = 0 }: { node: OrgNode; depth
         {hasChildren ? (
           <button
             onClick={() => setCollapsed((c) => !c)}
-            className="flex h-5 w-5 shrink-0 items-center justify-center text-muted hover:text-foreground"
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
             aria-label={collapsed ? "Expand" : "Collapse"}
           >
             {collapsed ? <Plus className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
@@ -32,7 +32,7 @@ export default function OrgChartNode({ node, depth = 0 }: { node: OrgNode; depth
         ) : (
           <span className="w-5 h-5 shrink-0" />
         )}
-        <div className="flex max-w-sm flex-1 items-start gap-3 rounded-lg border border-border bg-surface px-4 py-2.5 shadow-soft">
+        <div className="flex max-w-sm flex-1 items-start gap-3 rounded-lg border border-border bg-surface px-4 py-2.5 shadow-soft transition-all hover:border-primary-200 hover:shadow-md dark:hover:border-primary-800">
           <Avatar name={node.name} size="sm" />
           <div className="min-w-0">
             <Link
@@ -54,7 +54,7 @@ export default function OrgChartNode({ node, depth = 0 }: { node: OrgNode; depth
       </div>
 
       {hasChildren && !collapsed && (
-        <div>
+        <div className="animate-fade-in">
           {node.children.map((child) => (
             <OrgChartNode key={child.id} node={child} depth={depth + 1} />
           ))}

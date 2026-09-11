@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
+import { extractErrorMessage } from "@/lib/api-error";
 
 type Props = {
   employee: {
@@ -38,9 +39,13 @@ export default function EmployeeEditForm({ employee, departments }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setError(null);
     setSaved(false);
+    if (Number(form.baseSalary) < 0) {
+      setError("Annual salary cannot be negative.");
+      return;
+    }
+    setLoading(true);
     const res = await fetch(`/api/employees/${employee.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -55,7 +60,7 @@ export default function EmployeeEditForm({ employee, departments }: Props) {
     setLoading(false);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error?.formErrors?.[0] ?? body.error ?? "Failed to update employee");
+      setError(extractErrorMessage(body, "Failed to update employee"));
       return;
     }
     setSaved(true);
@@ -68,7 +73,7 @@ export default function EmployeeEditForm({ employee, departments }: Props) {
         <CardTitle>Edit Employee</CardTitle>
       </CardHeader>
       <form onSubmit={handleSubmit}>
-        <CardContent className="grid grid-cols-2 gap-4">
+        <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <Label>Job title</Label>
             <Input value={form.jobTitle} onChange={(e) => setForm({ ...form, jobTitle: e.target.value })} />
@@ -99,6 +104,7 @@ export default function EmployeeEditForm({ employee, departments }: Props) {
             <Input
               type="number"
               step="0.01"
+              min="0"
               value={form.baseSalary}
               onChange={(e) => setForm({ ...form, baseSalary: e.target.value })}
             />

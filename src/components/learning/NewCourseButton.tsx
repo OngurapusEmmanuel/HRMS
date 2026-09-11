@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
+import { extractErrorMessage } from "@/lib/api-error";
 
 export default function NewCourseButton() {
   const router = useRouter();
@@ -30,7 +31,7 @@ export default function NewCourseButton() {
     setLoading(false);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error?.formErrors?.[0] ?? body.error ?? "Failed to create course");
+      setError(extractErrorMessage(body, "Failed to create course"));
       return;
     }
     setOpen(false);

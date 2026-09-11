@@ -22,6 +22,7 @@ import {
   ChevronsRight,
   Building,
   Target,
+  MessageCircleHeart,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -34,6 +35,7 @@ const icons: Record<string, LucideIcon> = {
   recruitment: Briefcase,
   appraisals: ClipboardCheck,
   goals: Target,
+  feedback: MessageCircleHeart,
   learning: GraduationCap,
   leaves: CalendarClock,
   attendance: Clock,
@@ -75,12 +77,15 @@ export default function SidebarNav({ groups }: { groups: NavGroup[] }) {
         mounted ? "" : "invisible"
       )}
     >
-      <div className="flex h-14 items-center gap-2 border-b border-border px-4">
+      <Link
+        href="/dashboard"
+        className="flex h-14 items-center gap-2 border-b border-border px-4 transition-colors hover:bg-surface-2"
+      >
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary-500 text-white">
           <Building className="h-4 w-4" />
         </span>
         {!collapsed && <span className="truncate text-sm font-semibold text-foreground">HR System</span>}
-      </div>
+      </Link>
 
       <nav className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 py-4">
         {groups.map((group) => (
@@ -98,14 +103,14 @@ export default function SidebarNav({ groups }: { groups: NavGroup[] }) {
                     href={link.href}
                     title={collapsed ? link.label : undefined}
                     className={cn(
-                      "group relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
+                      "group relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-150",
                       active
                         ? "bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300"
-                        : "text-secondary hover:bg-surface-2 hover:text-foreground"
+                        : "text-secondary hover:translate-x-0.5 hover:bg-surface-2 hover:text-foreground"
                     )}
                   >
                     {active && (
-                      <span className="absolute -left-3 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary-500" />
+                      <span className="absolute -left-3 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary-500 transition-all" />
                     )}
                     <Icon className="h-4 w-4 shrink-0" />
                     {!collapsed && <span className="truncate">{link.label}</span>}

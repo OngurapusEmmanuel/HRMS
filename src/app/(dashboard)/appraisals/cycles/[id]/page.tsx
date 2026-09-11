@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableContainer, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import CloseCycleButton from "@/components/CloseCycleButton";
+import { appraisalCycleStatusVariant } from "@/lib/badge-variants";
 import { Users } from "lucide-react";
 
 function pct(submitted: number, total: number) {
@@ -27,7 +28,7 @@ function ReviewMeter({ label, submitted, total }: { label: string; submitted: nu
           </span>
         </div>
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
-          <div className="h-full bg-primary-500 transition-all" style={{ width: `${percent}%` }} />
+          <div className="h-full bg-primary-500 transition-all duration-300" style={{ width: `${percent}%` }} />
         </div>
       </CardContent>
     </Card>
@@ -65,23 +66,30 @@ export default async function AppraisalCycleDetailPage({ params }: { params: { i
         actions={canManage && cycle.status === "ACTIVE" ? <CloseCycleButton cycleId={cycle.id} /> : undefined}
       />
 
-      <Card className="mb-6 border-0 bg-primary-500 text-white shadow-soft">
+      {/* primary-500 shifts to a lighter blue in dark mode (tuned for use as
+          an accent on dark surfaces), which drops white-text contrast on a
+          solid fill below AA for normal-size text. dark:bg-primary-300 pins
+          this banner to a fixed, sufficiently dark blue in both themes.
+          The subtext also uses text-white/80 rather than text-primary-50 —
+          that token intentionally inverts in dark mode for use as a tint
+          background elsewhere, which would otherwise turn near-black here. */}
+      <Card className="mb-6 border-0 bg-primary-500 text-white shadow-soft dark:bg-primary-300">
         <CardContent className="flex flex-wrap items-center justify-between gap-6 p-6">
           <div>
             <div className="mb-1 flex items-center gap-2">
               <h2 className="text-lg font-semibold">{cycle.name}</h2>
-              <Badge variant={cycle.status === "ACTIVE" ? "success" : "neutral"} className="bg-white/20 text-white">
+              <Badge variant={appraisalCycleStatusVariant[cycle.status] ?? "neutral"} className="bg-white/20 text-white">
                 {cycle.status}
               </Badge>
             </div>
-            <p className="text-sm text-primary-50">
+            <p className="text-sm text-white/80">
               {cycle.periodStart.toLocaleDateString()} – {cycle.periodEnd.toLocaleDateString()} · Due{" "}
               {cycle.dueAt.toLocaleDateString()}
             </p>
           </div>
           <div className="text-right">
             <p className="text-4xl font-bold tabular-nums">{overallPercent}%</p>
-            <p className="text-sm text-primary-50">complete</p>
+            <p className="text-sm text-white/80">complete</p>
           </div>
         </CardContent>
       </Card>

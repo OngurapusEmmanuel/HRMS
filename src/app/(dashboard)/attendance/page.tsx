@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Clock } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -6,15 +7,24 @@ import { managedDepartmentIds } from "@/lib/rbac";
 import AttendanceActions from "@/components/AttendanceActions";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { attendanceStatusVariant } from "@/lib/badge-variants";
 import { TableContainer, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
-export default async function AttendancePage() {
+const PAGE_SIZE = 20;
+
+export default async function AttendancePage({
+  searchParams,
+}: {
+  searchParams: { page?: string };
+}) {
   const session = await getServerSession(authOptions);
   const organizationId = (session!.user as any).organizationId;
   const role = (session!.user as any).role;
   const employeeId = (session!.user as any).employeeId;
+
+  const page = Math.max(1, Number(searchParams.page ?? "1") || 1);
 
   let scopeFilter = {};
   if (role === "EMPLOYEE") {
@@ -25,14 +35,23 @@ export default async function AttendancePage() {
   }
 
   const today = new Date(new Date().toDateString());
-  const records = await prisma.attendanceRecord.findMany({
-    where: {
-      date: today,
-      employee: { organizationId },
-      ...scopeFilter,
-    },
-    include: { employee: { select: { firstName: true, lastName: true, employeeCode: true } } },
-  });
+  const where = {
+    date: today,
+    employee: { organizationId },
+    ...scopeFilter,
+  };
+
+  const [records, total] = await Promise.all([
+    prisma.attendanceRecord.findMany({
+      where,
+      include: { employee: { select: { firstName: true, lastName: true, employeeCode: true } } },
+      orderBy: { employee: { firstName: "asc" } },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    prisma.attendanceRecord.count({ where }),
+  ]);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div>
@@ -72,6 +91,28 @@ export default async function AttendancePage() {
           />
         )}
       </TableContainer>
+
+      {totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between text-sm text-secondary">
+          <span>
+            Page {page} of {totalPages} · {total} record{total === 1 ? "" : "s"}
+          </span>
+          <div className="flex gap-2">
+            <Link
+              href={`/attendance?page=${Math.max(1, page - 1)}`}
+              className={buttonVariants({ variant: "outline", size: "sm", className: page <= 1 ? "pointer-events-none opacity-40" : "" })}
+            >
+              Previous
+            </Link>
+            <Link
+              href={`/attendance?page=${Math.min(totalPages, page + 1)}`}
+              className={buttonVariants({ variant: "outline", size: "sm", className: page >= totalPages ? "pointer-events-none opacity-40" : "" })}
+            >
+              Next
+            </Link>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
+import { extractErrorMessage } from "@/lib/api-error";
 
 const schema = z.object({
   email: z.string().email(),
@@ -46,7 +47,7 @@ export default function AddEmployeeButton({ departments }: { departments: { id: 
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setServerError(body.error?.formErrors?.[0] ?? body.error ?? "Failed to create employee");
+      setServerError(extractErrorMessage(body, "Failed to create employee"));
       return;
     }
     reset();

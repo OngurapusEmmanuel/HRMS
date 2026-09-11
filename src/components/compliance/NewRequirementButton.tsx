@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
+import { extractErrorMessage } from "@/lib/api-error";
 
 export default function NewRequirementButton() {
   const router = useRouter();
@@ -30,7 +31,7 @@ export default function NewRequirementButton() {
     setLoading(false);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error?.formErrors?.[0] ?? body.error ?? "Failed to create requirement");
+      setError(extractErrorMessage(body, "Failed to create requirement"));
       return;
     }
     setOpen(false);

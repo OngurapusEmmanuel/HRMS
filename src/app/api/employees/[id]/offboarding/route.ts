@@ -2,16 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { canActOnDepartment } from "@/lib/rbac";
+import { canActOnEmployee } from "@/lib/rbac";
 
 // Who can see/manage an employee's offboarding checklist: HR/Admin org-wide,
 // the manager of that employee's department, or the employee themselves —
 // same rule as onboarding.
 async function canManageOffboarding(session: any, targetEmployee: { id: string; departmentId: string | null }) {
-  const role = session.user.role;
-  if (role === "ADMIN" || role === "HR") return true;
-  if (session.user.employeeId === targetEmployee.id) return true;
-  return canActOnDepartment(role, session.user.employeeId, targetEmployee.departmentId);
+  return canActOnEmployee(session.user.role, session.user.employeeId, targetEmployee.id, targetEmployee.departmentId);
 }
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {

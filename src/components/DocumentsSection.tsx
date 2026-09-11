@@ -12,6 +12,8 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { documentTypeVariant } from "@/lib/badge-variants";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { extractErrorMessage } from "@/lib/api-error";
 
 const DOCUMENT_TYPES = [
   { value: "CONTRACT", label: "Contract" },
@@ -67,6 +69,9 @@ export default function DocumentsSection({
   const [file, setFile] = useState<globalThis.File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Doc | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault();
@@ -84,7 +89,7 @@ export default function DocumentsSection({
     setUploading(false);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "Upload failed");
+      setError(extractErrorMessage(body, "Upload failed"));
       return;
     }
     const doc = await res.json();
@@ -96,9 +101,19 @@ export default function DocumentsSection({
     router.refresh();
   }
 
-  async function handleDelete(docId: string) {
-    const res = await fetch(`/api/employees/${employeeId}/documents/${docId}`, { method: "DELETE" });
-    if (res.ok) setDocuments((prev) => prev.filter((d) => d.id !== docId));
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError(null);
+    const res = await fetch(`/api/employees/${employeeId}/documents/${deleteTarget.id}`, { method: "DELETE" });
+    setDeleting(false);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setDeleteError(extractErrorMessage(body, "Failed to remove document"));
+      return;
+    }
+    setDocuments((prev) => prev.filter((d) => d.id !== deleteTarget.id));
+    setDeleteTarget(null);
   }
 
   return (
@@ -136,7 +151,10 @@ export default function DocumentsSection({
               </div>
               {canDelete && (
                 <button
-                  onClick={() => handleDelete(d.id)}
+                  onClick={() => {
+                    setDeleteError(null);
+                    setDeleteTarget(d);
+                  }}
                   className="rounded-lg p-1.5 text-muted transition-colors hover:bg-danger-100 hover:text-danger-700"
                   aria-label={`Remove ${d.title}`}
                 >
@@ -147,7 +165,12 @@ export default function DocumentsSection({
             );
           })}
         </div>
-        {documents.length === 0 && <EmptyState title="No documents uploaded yet" className="py-6" />}
+        {documents.length === 0 && <EmptyState icon={<FileText className="h-8 w-8" />} title="No documents uploaded yet" className="py-6" />}
+        {deleteError && (
+          <div className="mb-4">
+            <Alert variant="error">{deleteError}</Alert>
+          </div>
+        )}
 
         <form onSubmit={handleUpload} className="space-y-2 border-t border-border pt-4">
           <div className="flex items-end gap-2">
@@ -192,6 +215,21 @@ export default function DocumentsSection({
         )}
         <p className="mt-2 text-xs text-muted">Max 10MB. Stored locally in dev — swap lib/storage.ts for S3/GCS in production.</p>
       </CardContent>
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }
+        }}
+        title="Remove document?"
+        description={`This can't be undone. "${deleteTarget?.title ?? ""}" will be permanently removed.`}
+        confirmLabel="Remove"
+        variant="danger"
+        loading={deleting}
+        onConfirm={handleDelete}
+      />
     </Card>
   );
 }

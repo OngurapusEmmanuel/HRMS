@@ -53,6 +53,10 @@ export async function GET(req: NextRequest) {
     },
     include: { employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true } } },
     orderBy: { startDate: "asc" },
+    // Defensive ceiling — this is a calendar view (no pagination UI), but a
+    // large org with a long-overlapping month shouldn't be able to return an
+    // unbounded row set.
+    take: 500,
   });
 
   return NextResponse.json(requests);

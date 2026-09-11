@@ -146,7 +146,7 @@ export default async function EmployeeDetailPage({ params }: { params: { id: str
 
         <TabsContent value="overview" className="space-y-6">
           <Card>
-            <CardContent className="grid grid-cols-2 gap-4 text-sm">
+            <CardContent className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
               <div>
                 <p className="text-secondary">Email</p>
                 <p className="font-medium text-foreground">{employee.user.email}</p>

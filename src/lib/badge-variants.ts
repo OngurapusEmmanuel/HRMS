@@ -94,6 +94,11 @@ export const offerStatusVariant: Record<string, BadgeVariant> = {
   EXPIRED: "neutral",
 };
 
+export const appraisalCycleStatusVariant: Record<string, BadgeVariant> = {
+  ACTIVE: "success",
+  CLOSED: "neutral",
+};
+
 export const attendanceStatusVariant: Record<string, BadgeVariant> = {
   PRESENT: "success",
   LATE: "warning",

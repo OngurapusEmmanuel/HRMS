@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
+import { extractErrorMessage } from "@/lib/api-error";
 
 export default function AddCandidateButton({ jobPostingId }: { jobPostingId: string }) {
   const router = useRouter();
@@ -28,7 +29,7 @@ export default function AddCandidateButton({ jobPostingId }: { jobPostingId: str
     setLoading(false);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error?.formErrors?.[0] ?? body.error ?? "Failed to add candidate");
+      setError(extractErrorMessage(body, "Failed to add candidate"));
       return;
     }
     setOpen(false);

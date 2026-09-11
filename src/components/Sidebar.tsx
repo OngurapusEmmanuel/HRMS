@@ -23,6 +23,7 @@ export default async function Sidebar() {
         { href: "/recruitment", label: "Recruitment", iconKey: "recruitment" },
         { href: "/appraisals", label: "Appraisals", iconKey: "appraisals" },
         { href: "/goals", label: "Goals", iconKey: "goals" },
+        { href: "/feedback", label: "Feedback", iconKey: "feedback" },
         { href: "/learning", label: "Learning & Development", iconKey: "learning" },
       ],
     },

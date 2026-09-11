@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import "./env"; // validates process.env at import time — fail fast on boot, not mid-request
 
 // Prevent hot-reload from spawning a new PrismaClient (and new connection
 // pool) on every file change in dev.

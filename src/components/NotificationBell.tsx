@@ -26,16 +26,25 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   async function load() {
     try {
       const res = await fetch("/api/notifications");
-      if (!res.ok) return;
+      if (!res.ok) {
+        setLoadFailed(true);
+        return;
+      }
       const data = await res.json();
       setItems(data.items);
       setUnreadCount(data.unreadCount);
+      setLoadFailed(false);
     } catch {
-      // Silent — the bell just won't update this cycle; next poll retries.
+      // Keep showing whatever was last loaded successfully — this is a
+      // background poll, not a user action, so no toast/alert. Just flag
+      // that the latest attempt failed; the dropdown surfaces it quietly
+      // and the next poll retries automatically.
+      setLoadFailed(true);
     }
   }
 
@@ -85,6 +94,11 @@ export default function NotificationBell() {
             </button>
           )}
         </div>
+        {loadFailed && (
+          <p className="border-b border-border px-4 py-2 text-xs text-muted">
+            Couldn&apos;t load notifications. Retrying shortly.
+          </p>
+        )}
         <div className="max-h-96 divide-y divide-border overflow-y-auto">
           {items.map((n) => (
             <button
@@ -102,7 +116,9 @@ export default function NotificationBell() {
               </div>
             </button>
           ))}
-          {items.length === 0 && <p className="px-4 py-6 text-center text-sm text-muted">No notifications yet.</p>}
+          {items.length === 0 && !loadFailed && (
+            <p className="px-4 py-6 text-center text-sm text-muted">No notifications yet.</p>
+          )}
         </div>
       </DropdownMenuContent>
     </DropdownMenu>

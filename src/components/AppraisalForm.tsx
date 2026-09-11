@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { ratingVariant } from "@/lib/badge-variants";
+import { extractErrorMessage } from "@/lib/api-error";
 
 const CRITERIA = ["Communication", "Technical Skills", "Teamwork", "Punctuality", "Initiative"];
 
@@ -71,7 +72,7 @@ export default function AppraisalForm({
     setLoading(false);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error?.formErrors?.[0] ?? body.error ?? "Failed to submit appraisal");
+      setError(extractErrorMessage(body, "Failed to submit appraisal"));
       return;
     }
     setOpen(false);
